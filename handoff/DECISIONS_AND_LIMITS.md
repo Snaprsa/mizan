@@ -1,0 +1,15 @@
+# Decisions and constraints for continuation
+
+1. **One primary app.** Extend `Projects/Muqayyim-Downloads`; preserve the historical sibling paths until deliberate migration. Packaging does not flatten or merge unrelated codebases.
+2. **Map-first product.** The map is the main workspace. Satellite/hybrid imagery and a substantially better interface are now the next priority; a basic road map or external Google link is insufficient.
+3. **Data before automation claims.** Display what exists. Exact, approximate, aggregate and missing geography are different. Never invent transaction pins, heatmaps, planning facts or source dates.
+4. **Preserve useful calculations.** Initial income/DCF/cost reuse preserved engines. Legacy model artifacts and ROI heuristics are not validated market facts. Do not unpickle or auto-promote old model artifacts just to inspect the repository.
+5. **Financial traceability.** Keep source, date, unit and status for assumptions; immutable input/result snapshots; calculation/evidence freshness checks; and prior results. Manual inputs are not observations.
+6. **Honest data coverage.** The public source starts empty because private databases and unreviewed datasets are excluded. Candidate indicator/training files require quality/grain/source and sharing-rights review before import.
+7. **Credentials excluded.** No actual API keys, session cookies, private DBs or generated dependencies belong in the LLM transfer. Provider setup may still be necessary. Missing configuration is not a reason to fabricate a successful imagery demo.
+8. **Current API compatibility.** Recheck official map SDK documentation. The older Google Drawing Library and automatic raster 45-degree imagery are not valid foundations for a new implementation in October 2026.
+9. **No silent destructive migrations.** Preserve property/case/source IDs, overrides and history. Back up before migrations. Test against disposable databases. Do not merge Qaim or demo stores into the active database automatically.
+10. **Local development scope.** The launcher binds loopback. Property and legacy case/source/comparable/export routes have ownership checks and read-only-role guards. Production authentication, account/session lifecycle and institutional tenant controls remain incomplete; no production-readiness claim is made.
+11. **Scale limits.** The map projection currently reads owned rows before Python filtering, then caps output at 5,000. An upgrade should use bounded spatial queries/aggregation and explicit total/subset counts; the current cap is not a complete large-market GIS solution.
+12. **Keep UI work focused.** Improve the map shell, evidence inspector and valuation interactions. Preserve working unrelated screens. Avoid inert navigation or wholesale framework migration.
+13. **Historical docs remain historical.** `handoff/CURRENT_STATE.md` is the continuation baseline. Old assessments, logs, screenshots, CLAUDE files and prototype instructions are reference material, subject to the current user's task and canonical handoff.

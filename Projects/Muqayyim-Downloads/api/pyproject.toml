@@ -1,0 +1,79 @@
+[project]
+name = "muqayyim-api"
+version = "0.1.0"
+description = "Saudi Real Estate Valuation Platform — API"
+requires-python = ">=3.10"
+dependencies = [
+    # Web framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+    
+    # Database
+    "sqlalchemy[asyncio]>=2.0.25",
+    "asyncpg>=0.29.0",
+    "aiosqlite>=0.20.0",
+    "alembic>=1.13.0",
+    "psycopg2-binary>=2.9.9",
+    
+    # Validation
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    
+    # Task queue
+    "celery[redis]>=5.3.0",
+    "redis>=5.0.0",
+    
+    # HTTP client
+    "httpx>=0.26.0",
+    
+    # HTML parsing
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.1.0",
+    
+    # PDF parsing
+    "pdfplumber>=0.10.0",
+    "PyMuPDF>=1.23.0",
+    
+    # LLM
+    "anthropic>=0.40.0",
+    
+    # Export
+    "openpyxl>=3.1.0",
+    "reportlab>=4.0.0",
+    
+    # Auth
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    
+    # Utils
+    "python-dateutil>=2.8.0",
+    "hijri-converter>=2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.26.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

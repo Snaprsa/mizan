@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mizan | Saudi Real Estate Valuation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">⚖️</div>
+                <span class="logo-text">Mizan</span>
+            </div>
+            <nav class="nav">
+                <span class="nav-tagline">Saudi Real Estate Valuation</span>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">Property Valuation <span class="highlight">Made Simple</span></h1>
+            <p class="hero-subtitle">Get accurate, data-driven property valuations for Saudi real estate in seconds</p>
+        </div>
+        <div class="hero-decoration">
+            <div class="floating-card card-1">🏠</div>
+            <div class="floating-card card-2">📊</div>
+            <div class="floating-card card-3">💰</div>
+        </div>
+    </section>
+
+    <!-- Main Form Section -->
+    <main class="main-content">
+        <div class="form-container">
+            <div class="form-header">
+                <h2>Property Details</h2>
+                <p>Enter your property information for an instant valuation</p>
+            </div>
+
+            <form id="valuationForm" class="valuation-form">
+                <!-- Property Basics -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <span class="section-icon">🏢</span>
+                        Basic Information
+                    </h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="city">City *</label>
+                            <select id="city" name="city" required>
+                                <option value="">Select city</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="property_type">Property Type *</label>
+                            <select id="property_type" name="property_type" required>
+                                <option value="">Select type</option>
+                                <option value="apartment">Apartment</option>
+                                <option value="villa">Villa</option>
+                                <option value="land">Land</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="district">District *</label>
+                            <select id="district" name="district" required>
+                                <option value="">Select district</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="area_sqm">Area (sqm) *</label>
+                            <input type="number" id="area_sqm" name="area_sqm" placeholder="e.g. 180" required min="30"
+                                max="2000">
+                        </div>
+                        <div class="form-group">
+                            <label for="year_built">Year Built</label>
+                            <input type="number" id="year_built" name="year_built" placeholder="e.g. 2020" min="1970"
+                                max="2030">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rooms -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <span class="section-icon">🛏️</span>
+                        Rooms & Spaces
+                    </h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="bedrooms">Bedrooms</label>
+                            <input type="number" id="bedrooms" name="bedrooms" placeholder="e.g. 3" min="0" max="15">
+                        </div>
+                        <div class="form-group">
+                            <label for="bathrooms">Bathrooms</label>
+                            <input type="number" id="bathrooms" name="bathrooms" placeholder="e.g. 2" min="0" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="parking_count">Parking Spaces</label>
+                            <input type="number" id="parking_count" name="parking_count" placeholder="e.g. 1" min="0"
+                                max="10">
+                        </div>
+                        <div class="form-group apartment-only">
+                            <label for="floor_level">Floor Level</label>
+                            <input type="number" id="floor_level" name="floor_level" placeholder="e.g. 5" min="-2"
+                                max="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quality -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <span class="section-icon">⭐</span>
+                        Quality & Condition
+                    </h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="finish_tier">Finish Quality</label>
+                            <select id="finish_tier" name="finish_tier">
+                                <option value="">Select quality</option>
+                                <option value="1">1 - Basic</option>
+                                <option value="2">2 - Standard</option>
+                                <option value="3">3 - Good</option>
+                                <option value="4">4 - Premium</option>
+                                <option value="5">5 - Luxury</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="condition_tier">Condition</label>
+                            <select id="condition_tier" name="condition_tier">
+                                <option value="">Select condition</option>
+                                <option value="1">1 - Needs Renovation</option>
+                                <option value="2">2 - Fair</option>
+                                <option value="3">3 - Good</option>
+                                <option value="4">4 - Very Good</option>
+                                <option value="5">5 - Excellent</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Amenities -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <span class="section-icon">✨</span>
+                        Amenities
+                    </h3>
+                    <div class="amenities-grid">
+                        <label class="amenity-checkbox">
+                            <input type="checkbox" id="elevator" name="elevator" value="1">
+                            <span class="checkbox-custom"></span>
+                            <span class="amenity-label">🛗 Elevator</span>
+                        </label>
+                        <label class="amenity-checkbox">
+                            <input type="checkbox" id="central_ac" name="central_ac" value="1" checked>
+                            <span class="checkbox-custom"></span>
+                            <span class="amenity-label">❄️ Central AC</span>
+                        </label>
+                        <label class="amenity-checkbox">
+                            <input type="checkbox" id="maid_room" name="maid_room" value="1">
+                            <span class="checkbox-custom"></span>
+                            <span class="amenity-label">🚪 Maid Room</span>
+                        </label>
+                        <label class="amenity-checkbox">
+                            <input type="checkbox" id="garden" name="garden" value="1">
+                            <span class="checkbox-custom"></span>
+                            <span class="amenity-label">🌳 Garden</span>
+                        </label>
+                        <label class="amenity-checkbox">
+                            <input type="checkbox" id="private_entrance" name="private_entrance" value="1">
+                            <span class="checkbox-custom"></span>
+                            <span class="amenity-label">🚪 Private Entrance</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <span class="btn-text">Get Valuation</span>
+                    <span class="btn-icon">→</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-container" id="resultsContainer" style="display: none;">
+            <div class="results-header">
+                <h2>Valuation Results</h2>
+                <button class="close-btn" id="closeResults">×</button>
+            </div>
+
+            <div class="results-body">
+                <!-- Main Value -->
+                <div class="value-card main-value">
+                    <div class="value-label">Estimated Value</div>
+                    <div class="value-amount" id="mainValue">-</div>
+                    <div class="value-range" id="valueRange">-</div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">📐</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Price per sqm</div>
+                            <div class="metric-value" id="pricePerSqm">-</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">📊</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Confidence Score</div>
+                            <div class="metric-value" id="confidenceScore">-</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">📋</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Data Completeness</div>
+                            <div class="metric-value" id="completenessScore">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Confidence Bar -->
+                <div class="confidence-section">
+                    <div class="confidence-header">
+                        <span>Confidence Level</span>
+                        <span id="confidenceLabel">-</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill"></div>
+                    </div>
+                </div>
+
+                <!-- Value Drivers -->
+                <div class="drivers-section">
+                    <h3>Value Drivers</h3>
+                    <div class="drivers-list" id="driversList"></div>
+                </div>
+
+                <!-- Segment Info -->
+                <div class="segment-info" id="segmentInfo"></div>
+
+                <!-- Comparable Deals Section -->
+                <div class="comparables-section" id="comparablesSection" style="display: none;">
+                    <div class="comparables-header">
+                        <h3>📊 Similar Deals from Database</h3>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="showComparables">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Show Comparables</span>
+                        </label>
+                    </div>
+                    <div class="comparables-list" id="comparablesList" style="display: none;"></div>
+                </div>
+            </div>
+
+            <button class="new-valuation-btn" id="newValuationBtn">
+                New Valuation
+            </button>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Analyzing property...</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Mizan Phase 1 • Riyadh Real Estate Valuation • Powered by Machine Learning</p>
+    </footer>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>

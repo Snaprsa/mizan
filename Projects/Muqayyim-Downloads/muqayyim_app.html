@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Muqaaem مقيم — Saudi Real Estate Valuation</title>
+  
+  
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; }
+    :root { --blue: #2563eb; --blue-dark: #1d4ed8; --slate-900: #0f172a; --slate-700: #334155; --slate-500: #64748b; --slate-300: #cbd5e1; --slate-100: #f1f5f9; --slate-50: #f8fafc; --green: #16a34a; --red: #dc2626; --amber: #d97706; }
+
+    /* Layout */
+    .app { display: flex; height: 100vh; overflow: hidden; }
+    aside { width: 240px; flex-shrink: 0; background: var(--slate-900); display: flex; flex-direction: column; }
+    main { flex: 1; overflow-y: auto; padding: 32px; }
+
+    /* Sidebar */
+    .logo-area { padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; gap: 12px; }
+    .logo-icon { width: 36px; height: 36px; background: var(--blue); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+    .logo-text { color: white; font-size: 14px; font-weight: 600; line-height: 1.3; }
+    .logo-sub { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+    nav { padding: 12px 8px; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; margin-bottom: 2px; text-decoration: none; border: none; background: none; width: 100%; text-align: left; }
+    .nav-item:hover { background: rgba(255,255,255,.07); color: white; }
+    .nav-item.active { background: rgba(37,99,235,.3); color: white; }
+    .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+    .nav-section { color: #475569; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; padding: 16px 12px 6px; }
+    .badge { margin-left: auto; background: rgba(255,255,255,.1); color: #cbd5e1; font-size: 10px; padding: 2px 7px; border-radius: 10px; }
+    .badge.live { background: rgba(34,197,94,.2); color: #4ade80; }
+    .sidebar-status { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.08); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 6px; box-shadow: 0 0 0 2px rgba(74,222,128,.3); }
+    .status-text { font-size: 11px; color: #94a3b8; }
+
+    /* Cards / Panels */
+    .page-header { margin-bottom: 28px; }
+    .page-title { font-size: 22px; font-weight: 700; color: var(--slate-900); }
+    .page-sub { color: var(--slate-500); font-size: 14px; margin-top: 4px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+    .card-header { padding: 18px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-weight: 600; font-size: 15px; }
+    .card-body { padding: 20px; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all .15s; text-decoration: none; }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-secondary { background: white; color: var(--slate-700); border: 1px solid #e2e8f0; }
+    .btn-secondary:hover { background: var(--slate-50); }
+    .btn-danger { background: #fee2e2; color: var(--red); }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-icon { padding: 7px; }
+
+    /* Stat cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; }
+    .stat-label { font-size: 12px; color: var(--slate-500); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--slate-900); line-height: 1; }
+    .stat-sub { font-size: 12px; color: var(--slate-500); margin-top: 6px; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: .05em; background: var(--slate-50); border-bottom: 1px solid #e2e8f0; }
+    td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: var(--slate-700); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbfc; }
+    .clickable { cursor: pointer; }
+    .clickable:hover td { background: #f0f9ff; }
+
+    /* Badges */
+    .tag { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+    .tag-blue { background: #dbeafe; color: #1d4ed8; }
+    .tag-green { background: #dcfce7; color: #15803d; }
+    .tag-amber { background: #fef3c7; color: #92400e; }
+    .tag-red { background: #fee2e2; color: #b91c1c; }
+    .tag-gray { background: #f1f5f9; color: #64748b; }
+    .tag-purple { background: #ede9fe; color: #6d28d9; }
+
+    /* Forms */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: var(--slate-700); margin-bottom: 6px; }
+    input[type=text], input[type=url], textarea, select {
+      width: 100%; padding: 9px 13px; border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 13px; font-family: inherit; color: var(--slate-900); outline: none; transition: border .15s;
+      background: white;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+    textarea { resize: vertical; min-height: 80px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 24px; padding: 0 4px; }
+    .tab { padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--slate-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+    .tab:hover { color: var(--slate-900); }
+    .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    /* Alerts */
+    .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px; }
+    .alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+    /* Empty states */
+    .empty { text-align: center; padding: 48px 24px; color: var(--slate-500); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-title { font-weight: 600; font-size: 15px; color: var(--slate-700); margin-bottom: 6px; }
+    .empty-text { font-size: 13px; }
+
+    /* Utilities */
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 8px; }
+    .gap-3 { gap: 12px; }
+    .mt-4 { margin-top: 16px; }
+    .mt-6 { margin-top: 24px; }
+    .mb-4 { margin-bottom: 16px; }
+    .text-sm { font-size: 13px; }
+    .text-xs { font-size: 11px; }
+    .text-muted { color: var(--slate-500); }
+    .font-mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--slate-500); }
+    .hidden { display: none !important; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar { height: 4px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--blue); border-radius: 99px; transition: width .4s; }
+    .source-url { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--slate-500); }
+    .confidence-bar { display: flex; align-items: center; gap: 8px; }
+    .conf-fill { height: 6px; border-radius: 3px; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 12px; display: flex; align-items: center; gap-6px; }
+    .divider { border: none; border-top: 1px solid #f1f5f9; margin: 16px 0; }
+
+    /* Field citation popover */
+    .field-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f8fafc; }
+    .field-name { font-size: 12px; color: var(--slate-500); font-weight: 500; text-transform: capitalize; min-width: 140px; }
+    .field-value { font-size: 13px; color: var(--slate-900); font-weight: 500; flex: 1; }
+    .field-conf { font-size: 11px; color: var(--slate-400); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .modal { background: white; border-radius: 14px; width: 560px; max-height: 80vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,.2); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .modal-title { font-size: 16px; font-weight: 600; }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* Toast */
+    #toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+    .toast { background: var(--slate-900); color: white; padding: 12px 18px; border-radius: 10px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: 340px; animation: slideIn .2s ease; }
+    .toast.success { background: #166534; }
+    .toast.error { background: #991b1b; }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* Export section */
+    .export-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: white; }
+    .export-info h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .export-info p { font-size: 12px; color: var(--slate-500); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside>
+    <div class="logo-area">
+      <div class="logo-icon">🏢</div>
+      <div>
+        <div class="logo-text">Muqaaem مقيم</div>
+        <div class="logo-sub">Valuation Platform</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-section">Workspace</div>
+      <button class="nav-item active" onclick="showPage('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="showPage('newCase')">
+        <span class="nav-icon">➕</span> New Case
+      </button>
+      <div class="nav-section">Data Sources</div>
+      <button class="nav-item" onclick="showPage('monitoring')">
+        <span class="nav-icon">📡</span> Monitoring
+        <span class="badge live">Live</span>
+      </button>
+      <button class="nav-item" onclick="showPage('sources')">
+        <span class="nav-icon">🗄️</span> Source Registry
+      </button>
+      <div class="nav-section">Coming Soon</div>
+      <button class="nav-item" style="opacity:.5;cursor:default">
+        <span class="nav-icon">🎯</span> Subject Property
+      </button>
+      <button class="nav-item" style="opacity:.5;cursor:default">
+        <span class="nav-icon">⚖️</span> Adjustments
+      </button>
+      <button class="nav-item" style="opacity:.5;cursor:default">
+        <span class="nav-icon">📋</span> Valuation Report
+      </button>
+    </nav>
+    <div class="sidebar-status">
+      <span class="status-dot"></span>
+      <span class="status-text" id="api-status">Starting local workspace…</span>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main id="main-content">
+    <!-- Dashboard -->
+    <div id="page-dashboard">
+      <div class="page-header flex justify-between items-center">
+        <div>
+          <div class="page-title">Valuation Cases</div>
+          <div class="page-sub">Manage your real estate comparable analysis files</div>
+        </div>
+        <button class="btn btn-primary" onclick="showPage('newCase')">
+          ➕ New Case
+        </button>
+      </div>
+
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Cases</div>
+          <div class="stat-value" id="stat-cases">—</div>
+          <div class="stat-sub">All valuation files</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Sources</div>
+          <div class="stat-value" id="stat-sources">—</div>
+          <div class="stat-sub">URLs & PDFs ingested</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Comparables</div>
+          <div class="stat-value" id="stat-comps">—</div>
+          <div class="stat-sub">Extracted data points</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Active Cases</div>
+          <div id="cases-loading" class="spinner"></div>
+        </div>
+        <div id="cases-table-container">
+          <table id="cases-table">
+            <thead>
+              <tr>
+                <th>Case Title</th>
+                <th>Status</th>
+                <th>Sources</th>
+                <th>Comps</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="cases-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Case -->
+    <div id="page-newCase" class="hidden">
+      <div class="page-header">
+        <button class="btn btn-secondary btn-sm" onclick="showPage('dashboard')">← Back</button>
+        <div class="page-title" style="margin-top:12px">Create New Case</div>
+        <div class="page-sub">Start a new real estate valuation analysis</div>
+      </div>
+      <div class="card" style="max-width:600px">
+        <div class="card-header"><div class="card-title">Case Details</div></div>
+        <div class="card-body">
+          <div id="new-case-alert"></div>
+          <div class="form-group">
+            <label>Case Title *</label>
+            <input type="text" id="case-title" placeholder="e.g. Riyadh Grade-A Office Tower Valuation" />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="case-desc" placeholder="Brief description of the valuation subject and objectives…"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
+            <button class="btn btn-secondary" onclick="showPage('dashboard')">Cancel</button>
+            <button class="btn btn-primary" onclick="createCase()">✓ Create Case</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Case Detail -->
+    <div id="page-caseDetail" class="hidden">
+      <div class="page-header flex justify-between items-center">
+        <div>
+          <button class="btn btn-secondary btn-sm" onclick="showPage('dashboard')" style="margin-bottom:10px">← All Cases</button>
+          <div class="page-title" id="detail-title">Loading…</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+            <span id="detail-status-badge" class="tag tag-gray"></span>
+            <span class="text-xs text-muted" id="detail-created"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="sources" onclick="switchTab('sources')">📎 Sources</div>
+        <div class="tab" data-tab="comparables" onclick="switchTab('comparables')">📊 Comparables</div>
+        <div class="tab" data-tab="export" onclick="switchTab('export')">📥 Export</div>
+      </div>
+
+      <!-- Sources Tab -->
+      <div id="tab-sources">
+        <div class="card mb-4">
+          <div class="card-header"><div class="card-title">Add URL Source</div></div>
+          <div class="card-body">
+            <div id="add-url-alert"></div>
+            <div style="display:flex;gap:10px">
+              <input type="url" id="source-url" placeholder="https://sa.aqar.fm/شقق-للبيع/الرياض/..." style="flex:1" />
+              <button class="btn btn-primary" onclick="addUrlSource()">+ Add URL</button>
+            </div>
+            <div class="text-xs text-muted mt-4" style="margin-top:8px">Paste Aqar, AqarSAS, Paseetah, or any listing URL</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Sources</div>
+            <div id="sources-loading" class="spinner hidden"></div>
+          </div>
+          <table>
+            <thead><tr><th>Source</th><th>Type</th><th>Status</th><th>Added</th><th>Actions</th></tr></thead>
+            <tbody id="sources-tbody"></tbody>
+          </table>
+          <div id="sources-empty" class="empty hidden">
+            <div class="empty-icon">🔗</div>
+            <div class="empty-title">No sources yet</div>
+            <div class="empty-text">Add a URL or upload a PDF to start extracting comparables</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comparables Tab -->
+      <div id="tab-comparables" class="hidden">
+        <div id="comps-loading" class="alert alert-info hidden"><span class="spinner"></span> &nbsp;Loading comparables…</div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Extracted Comparables</div>
+            <span id="comps-count" class="tag tag-blue"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr>
+                <th>Property</th><th>City / District</th><th>Type</th>
+                <th>Asking Price</th><th>Area m²</th><th>SAR/m²</th>
+                <th>Reliability</th><th>Status</th><th></th>
+              </tr></thead>
+              <tbody id="comps-tbody"></tbody>
+            </table>
+          </div>
+          <div id="comps-empty" class="empty hidden">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">No comparables yet</div>
+            <div class="empty-text">Add sources and run extraction to generate comparables</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Tab -->
+      <div id="tab-export" class="hidden">
+        <div class="alert alert-info">
+          ℹ️ Local exports include all saved comparables for this case and work without a backend.
+        </div>
+        <div class="export-card">
+          <div class="export-info">
+            <h3>📊 CSV Spreadsheet</h3>
+            <p>All comparables with extracted fields, ready for Excel or Numbers</p>
+          </div>
+          <button class="btn btn-primary" onclick="downloadExport('csv')">⬇ Download CSV</button>
+        </div>
+        <div class="export-card">
+          <div class="export-info">
+            <h3>🧾 JSON Snapshot</h3>
+            <p>Structured case + comparable data for scripting and future imports</p>
+          </div>
+          <button class="btn btn-secondary" onclick="downloadExport('json')">⬇ Download JSON</button>
+        </div>
+        <div class="export-card">
+          <div class="export-info">
+            <h3>📄 Printable Summary</h3>
+            <p>Single-page HTML report for quick review or printing from Safari</p>
+          </div>
+          <button class="btn btn-secondary" onclick="downloadExport('html')">⬇ Open Summary</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monitoring Page -->
+    <div id="page-monitoring" class="hidden">
+      <div class="page-header">
+        <div class="page-title">📡 Market Monitoring</div>
+        <div class="page-sub">Real-time intelligence on Saudi real estate transactions and listings</div>
+      </div>
+      <div class="alert alert-info">
+        ℹ️ The monitoring script watches 10+ Saudi sources for new valuation-relevant data. Run <code style="background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:12px">python3 scripts/monitoring/monitor_sources.py</code> to collect new data.
+      </div>
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-title">Monitored Sources</div></div>
+        <table>
+          <thead><tr><th>Source</th><th>Type</th><th>Saudi-Specific</th><th>Data Types</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Aqar.fm</strong></td><td><span class="tag tag-blue">Listings</span></td><td>✅</td><td>Residential, Commercial listings</td><td><span class="tag tag-green">Active</span></td></tr>
+            <tr><td><strong>Tadawul Announcements</strong></td><td><span class="tag tag-purple">Disclosures</span></td><td>✅</td><td>Listed company transactions, acquisitions</td><td><span class="tag tag-green">Active</span></td></tr>
+            <tr><td><strong>Ejar (Ministry of Housing)</strong></td><td><span class="tag tag-amber">Transactions</span></td><td>✅</td><td>Registered lease transactions</td><td><span class="tag tag-amber">Semi-public</span></td></tr>
+            <tr><td><strong>AqarSAS</strong></td><td><span class="tag tag-blue">Listings</span></td><td>✅</td><td>Analytics, market comparables</td><td><span class="tag tag-green">Active</span></td></tr>
+            <tr><td><strong>Paseetah</strong></td><td><span class="tag tag-blue">Listings</span></td><td>✅</td><td>Residential listings, historical data</td><td><span class="tag tag-green">Active</span></td></tr>
+            <tr><td><strong>Saudi Gazette (Property)</strong></td><td><span class="tag tag-gray">News</span></td><td>✅</td><td>Deal announcements, market news</td><td><span class="tag tag-green">Active</span></td></tr>
+            <tr><td><strong>Al Arabiya Real Estate</strong></td><td><span class="tag tag-gray">News</span></td><td>✅</td><td>Transaction news, market reports</td><td><span class="tag tag-green">Active</span></td></tr>
+            <tr><td><strong>CBRE Saudi Arabia</strong></td><td><span class="tag tag-purple">Reports</span></td><td>✅</td><td>Market research, valuations</td><td><span class="tag tag-amber">Manual</span></td></tr>
+            <tr><td><strong>JLL Saudi Arabia</strong></td><td><span class="tag tag-purple">Reports</span></td><td>✅</td><td>Market indices, benchmarks</td><td><span class="tag tag-amber">Manual</span></td></tr>
+            <tr><td><strong>SAMA Real Estate Data</strong></td><td><span class="tag tag-amber">Transactions</span></td><td>✅</td><td>Aggregated market statistics</td><td><span class="tag tag-amber">Periodic</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Quick Start — Monitoring</div></div>
+        <div class="card-body">
+          <div class="text-sm text-muted mb-4" style="margin-bottom:12px">Run these commands from the project folder:</div>
+          <div style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:10px;font-family:monospace;font-size:12px;line-height:1.8">
+            <div style="color:#94a3b8"># Run monitoring (checks 10+ sources, saves to data/monitoring/)</div>
+            <div style="color:#4ade80">$ python3 scripts/monitoring/monitor_sources.py</div>
+            <br/>
+            <div style="color:#94a3b8"># Collect a specific listing</div>
+            <div style="color:#4ade80">$ python3 scripts/collection/aqar_collector.py "https://sa.aqar.fm/..."</div>
+            <br/>
+            <div style="color:#94a3b8"># Schedule daily monitoring (cron)</div>
+            <div style="color:#4ade80">$ crontab -e</div>
+            <div style="color:#e2e8f0">0 7 * * * cd /path/to/muqayyim && python3 scripts/monitoring/monitor_sources.py</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Source Registry Page -->
+    <div id="page-sources" class="hidden">
+      <div class="page-header">
+        <div class="page-title">🗄️ Saudi Real Estate Source Registry</div>
+        <div class="page-sub">All known data sources for Saudi real estate valuation intelligence</div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Source</th><th>Type</th><th>Accessibility</th><th>Fields Available</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Aqar.fm</strong><div class="text-xs text-muted">sa.aqar.fm</div></td><td><span class="tag tag-blue">Listings</span></td><td><span class="tag tag-green">Public</span></td><td>Price, area, type, district, bedrooms, photos</td><td>Main Saudi listing marketplace</td></tr>
+            <tr><td><strong>AqarSAS</strong><div class="text-xs text-muted">aqarsas.sa</div></td><td><span class="tag tag-amber">Transactions</span></td><td><span class="tag tag-amber">Login req.</span></td><td>Registry transactions, price/sqm analytics</td><td>Officially-registered deals</td></tr>
+            <tr><td><strong>Paseetah</strong><div class="text-xs text-muted">paseetah.com</div></td><td><span class="tag tag-blue">Analytics</span></td><td><span class="tag tag-amber">Login req.</span></td><td>Listing history, price trends, area analytics</td><td>Historical listing data</td></tr>
+            <tr><td><strong>Ejar</strong><div class="text-xs text-muted">ejar.sa</div></td><td><span class="tag tag-amber">Transactions</span></td><td><span class="tag tag-amber">Semi-public</span></td><td>Registered leases, contract values</td><td>Ministry of Housing platform</td></tr>
+            <tr><td><strong>Tadawul (Muqeem)</strong><div class="text-xs text-muted">tadawul.com.sa</div></td><td><span class="tag tag-purple">Disclosures</span></td><td><span class="tag tag-green">Public</span></td><td>Listed co. property transactions, valuations</td><td>Mandatory REIT/REOC disclosures</td></tr>
+            <tr><td><strong>Bayut Saudi</strong><div class="text-xs text-muted">bayut.sa</div></td><td><span class="tag tag-blue">Listings</span></td><td><span class="tag tag-green">Public</span></td><td>Price, area, type, location, agent info</td><td>International listing platform</td></tr>
+            <tr><td><strong>Property Finder SA</strong><div class="text-xs text-muted">propertyfinder.sa</div></td><td><span class="tag tag-blue">Listings</span></td><td><span class="tag tag-green">Public</span></td><td>Commercial & residential listings</td><td>Strong in commercial sector</td></tr>
+            <tr><td><strong>CBRE Saudi Arabia</strong><div class="text-xs text-muted">cbre.com/saudi</div></td><td><span class="tag tag-purple">Reports</span></td><td><span class="tag tag-amber">Manual</span></td><td>Market reports, valuations, indices</td><td>Leading international valuer</td></tr>
+            <tr><td><strong>JLL Saudi Arabia</strong><div class="text-xs text-muted">jll.com.sa</div></td><td><span class="tag tag-purple">Reports</span></td><td><span class="tag tag-amber">Manual</span></td><td>Market research, rental data, yields</td><td>Quarterly market surveys</td></tr>
+            <tr><td><strong>Knight Frank Saudi</strong><div class="text-xs text-muted">knightfrank.com.sa</div></td><td><span class="tag tag-purple">Reports</span></td><td><span class="tag tag-amber">Manual</span></td><td>Prime residential, hotel reports</td><td>Luxury & hospitality focus</td></tr>
+            <tr><td><strong>Savills Saudi</strong><div class="text-xs text-muted">savills.com.sa</div></td><td><span class="tag tag-purple">Reports</span></td><td><span class="tag tag-amber">Manual</span></td><td>Retail, industrial market reports</td><td>Retail & logistics specialist</td></tr>
+            <tr><td><strong>SAMA Data</strong><div class="text-xs text-muted">sama.gov.sa</div></td><td><span class="tag tag-amber">Transactions</span></td><td><span class="tag tag-green">Public</span></td><td>Mortgage stats, market aggregates</td><td>Central bank statistics</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Comparable Detail Modal -->
+<div id="comp-modal" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Comparable Fields</div>
+      <button class="btn btn-secondary btn-sm btn-icon" onclick="document.getElementById('comp-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body" id="comp-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('comp-modal').classList.add('hidden')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script>
+const API = '/api/v1';
+let currentCaseId = null;
+let currentTab = 'sources';
+let latestComparables = [];
+
+// ─── Toast ──────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ─── API Health ──────────────────────────────────────────
+async function checkApi() {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    document.getElementById('api-status').textContent = d.mode === 'local'
+      ? `Local workspace — ${d.counts?.cases ?? 0} cases ready`
+      : `API ${d.version} — OK`;
+    document.getElementById('api-status').style.color = '#4ade80';
+  } catch(e) {
+    document.getElementById('api-status').textContent = 'Local workspace unavailable';
+    document.getElementById('api-status').style.color = '#f87171';
+  }
+}
+
+// ─── Page Navigation ─────────────────────────────────────
+function showPage(page, caseId = null) {
+  document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+  document.getElementById(`page-${page}`).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (page === 'dashboard') { loadDashboard(); document.querySelectorAll('.nav-item')[0].classList.add('active'); }
+  if (page === 'monitoring') document.querySelectorAll('.nav-item')[2].classList.add('active');
+  if (page === 'sources') document.querySelectorAll('.nav-item')[3].classList.add('active');
+  if (page === 'caseDetail' && caseId) { currentCaseId = caseId; switchTab('sources'); loadCaseDetail(caseId); }
+  if (page === 'newCase') document.querySelectorAll('.nav-item')[1].classList.add('active');
+}
+
+// ─── Dashboard ───────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('cases-loading').classList.remove('hidden');
+  try {
+    const r = await fetch(`${API}/cases`);
+    const { data, total } = await r.json();
+    renderCasesTable(data);
+    let totalSrc = 0, totalComp = 0;
+    data.forEach(c => { totalSrc += c.source_count; totalComp += c.comparable_count; });
+    document.getElementById('stat-cases').textContent = total;
+    document.getElementById('stat-sources').textContent = totalSrc;
+    document.getElementById('stat-comps').textContent = totalComp;
+  } catch(e) {
+    toast('Failed to load cases: ' + e.message, 'error');
+  } finally {
+    document.getElementById('cases-loading').classList.add('hidden');
+  }
+}
+
+function statusTag(status) {
+  const map = { draft: 'tag-gray', in_progress: 'tag-blue', review: 'tag-amber', completed: 'tag-green', archived: 'tag-gray' };
+  return `<span class="tag ${map[status] || 'tag-gray'}">${status}</span>`;
+}
+
+function renderCasesTable(cases) {
+  const tbody = document.getElementById('cases-tbody');
+  if (!cases.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">📁</div><div class="empty-title">No cases yet</div><div class="empty-text">Create your first valuation case to get started</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = cases.map(c => `
+    <tr class="clickable" onclick="showPage('caseDetail','${c.id}')">
+      <td><strong>${c.title}</strong></td>
+      <td>${statusTag(c.status)}</td>
+      <td><span class="tag tag-gray">${c.source_count}</span></td>
+      <td><span class="tag tag-blue">${c.comparable_count}</span></td>
+      <td class="text-xs text-muted">${new Date(c.created_at).toLocaleDateString('en-SA')}</td>
+      <td><button class="btn btn-secondary btn-sm">Open →</button></td>
+    </tr>
+  `).join('');
+}
+
+// ─── Create Case ─────────────────────────────────────────
+async function createCase() {
+  const title = document.getElementById('case-title').value.trim();
+  if (!title) { document.getElementById('new-case-alert').innerHTML = '<div class="alert alert-error">Case title is required.</div>'; return; }
+  try {
+    const r = await fetch(`${API}/cases`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ title, description: document.getElementById('case-desc').value })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Failed to create case');
+    toast(`Case "${d.title}" created!`, 'success');
+    document.getElementById('case-title').value = '';
+    document.getElementById('case-desc').value = '';
+    showPage('caseDetail', d.id);
+  } catch(e) {
+    document.getElementById('new-case-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ─── Case Detail ─────────────────────────────────────────
+async function loadCaseDetail(caseId) {
+  try {
+    const r = await fetch(`${API}/cases/${caseId}`);
+    const d = await r.json();
+    document.getElementById('detail-title').textContent = d.title;
+    document.getElementById('detail-status-badge').textContent = d.status;
+    document.getElementById('detail-status-badge').className = `tag ${d.status === 'completed' ? 'tag-green' : d.status === 'in_progress' ? 'tag-blue' : 'tag-gray'}`;
+    document.getElementById('detail-created').textContent = `Created ${new Date(d.created_at).toLocaleDateString('en-SA')}`;
+  } catch(e) { console.error(e); }
+  loadSources(caseId);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('tab-sources').classList.toggle('hidden', tab !== 'sources');
+  document.getElementById('tab-comparables').classList.toggle('hidden', tab !== 'comparables');
+  document.getElementById('tab-export').classList.toggle('hidden', tab !== 'export');
+  if (tab === 'comparables') loadComparables(currentCaseId);
+}
+
+// ─── Sources ─────────────────────────────────────────────
+async function loadSources(caseId) {
+  document.getElementById('sources-loading').classList.remove('hidden');
+  try {
+    const r = await fetch(`${API}/cases/${caseId}/sources`);
+    const _sbody = await r.json();
+    const data = Array.isArray(_sbody) ? _sbody : (_sbody.data || []);
+    renderSources(data);
+  } catch(e) { toast('Error loading sources', 'error'); }
+  finally { document.getElementById('sources-loading').classList.add('hidden'); }
+}
+
+function sourceStatusTag(s) {
+  const m = { pending: 'tag-gray', fetching: 'tag-amber', fetched: 'tag-blue', failed: 'tag-red' };
+  return `<span class="tag ${m[s]||'tag-gray'}">${s}</span>`;
+}
+
+function renderSources(sources) {
+  const tbody = document.getElementById('sources-tbody');
+  const empty = document.getElementById('sources-empty');
+  if (!sources.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  tbody.innerHTML = sources.map(s => `
+    <tr>
+      <td><div class="source-url">${s.url || s.file_name || '—'}</div></td>
+      <td><span class="tag tag-blue">${s.source_type}</span></td>
+      <td>${sourceStatusTag(s.status)}</td>
+      <td class="text-xs text-muted">${new Date(s.created_at).toLocaleDateString('en-SA')}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="runExtraction('${s.id}')">⚡ Extract</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function addUrlSource() {
+  const url = document.getElementById('source-url').value.trim();
+  if (!url) { toast('Please enter a URL', 'error'); return; }
+  try {
+    const r = await fetch(`${API}/cases/${currentCaseId}/sources/url`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Failed'); }
+    toast('Source added!', 'success');
+    document.getElementById('source-url').value = '';
+    loadSources(currentCaseId);
+  } catch(e) {
+    document.getElementById('add-url-alert').innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function runExtraction(sourceId) {
+  toast('Starting extraction…', 'info');
+  try {
+    const r = await fetch(`${API}/sources/${sourceId}/extract`, { method: 'POST' });
+    const d = await r.json();
+    if (d.status === 'failed') {
+      toast('Extraction failed: ' + (d.message || 'Unknown error'), 'error');
+    } else {
+      toast('Extraction job started (job: ' + d.job_id?.slice(0,8) + '…)', 'success');
+      setTimeout(() => loadSources(currentCaseId), 2000);
+    }
+  } catch(e) { toast('Extraction error: ' + e.message, 'error'); }
+}
+
+// ─── Comparables ─────────────────────────────────────────
+async function loadComparables(caseId) {
+  try {
+    const r = await fetch(`${API}/cases/${caseId}/comparables`);
+    const { data, total } = await r.json();
+    latestComparables = data;
+    renderComparables(data, total);
+  } catch(e) { toast('Error loading comparables', 'error'); }
+}
+
+function fmtPrice(v) { if (!v) return '—'; return 'SAR ' + Number(v).toLocaleString('en-SA'); }
+function fmtArea(v) { if (!v) return '—'; return Number(v).toLocaleString('en-SA') + ' m²'; }
+function reliabilityBadge(r) { const m = [,'tag-red','tag-red','tag-amber','tag-blue','tag-green']; const l = [,'Unverified','Hearsay','Broker','Marketplace','Official']; return `<span class="tag ${m[r]||'tag-gray'}">${l[r]||r}</span>`; }
+function compStatusTag(s) { const m = {active:'tag-green',invalid:'tag-red',outlier:'tag-amber',draft:'tag-gray'}; return `<span class="tag ${m[s]||'tag-gray'}">${s}</span>`; }
+
+function renderComparables(comps, total) {
+  const tbody = document.getElementById('comps-tbody');
+  const empty = document.getElementById('comps-empty');
+  const countEl = document.getElementById('comps-count');
+  countEl.textContent = `${total} comparable${total !== 1 ? 's' : ''}`;
+  if (!comps.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  tbody.innerHTML = comps.map(c => `
+    <tr class="clickable" onclick="showCompModal('${c.id}')">
+      <td><strong>${c.property_title || '(untitled)'}</strong></td>
+      <td>${c.city || '—'}${c.district ? ' / ' + c.district : ''}</td>
+      <td><span class="tag tag-gray">${c.property_type || '—'}</span></td>
+      <td>${fmtPrice(c.asking_price)}</td>
+      <td>${fmtArea(c.primary_area_sqm)}</td>
+      <td>${c.price_per_sqm ? 'SAR ' + Math.round(c.price_per_sqm).toLocaleString() : '—'}</td>
+      <td>${reliabilityBadge(c.reliability_score)}</td>
+      <td>${compStatusTag(c.status)}</td>
+      <td><button class="btn btn-secondary btn-sm btn-icon">👁</button></td>
+    </tr>
+  `).join('');
+}
+
+async function showCompModal(compId) {
+  document.getElementById('comp-modal').classList.remove('hidden');
+  const comp = latestComparables.find(item => item.id === compId);
+  if (!comp) {
+    document.getElementById('comp-modal-body').innerHTML = '<div class="alert alert-error">Comparable details were not found.</div>';
+    return;
+  }
+  const fields = [
+    ['Property', comp.property_title],
+    ['City', comp.city],
+    ['District', comp.district],
+    ['Type', comp.property_type],
+    ['Price', fmtPrice(comp.asking_price)],
+    ['Area', fmtArea(comp.primary_area_sqm)],
+    ['SAR/m²', comp.price_per_sqm ? `SAR ${Math.round(comp.price_per_sqm).toLocaleString('en-SA')}` : '—'],
+    ['Reliability', comp.reliability_score],
+    ['Status', comp.status],
+    ['Source URL', comp.source_url],
+    ['Notes', comp.notes],
+  ];
+  document.getElementById('comp-modal-body').innerHTML = `
+    <div class="alert alert-info">Saved in local Muqaaem mode. Add URLs, run extraction, and the details stay on this Mac.</div>
+    ${fields.map(([name, value]) => `
+      <div class="field-row">
+        <div class="field-name">${name}</div>
+        <div class="field-value">${value || '—'}</div>
+      </div>
+    `).join('')}
+    ${comp.raw_text ? `
+      <hr class="divider" />
+      <div class="section-title">Raw Text Preview</div>
+      <div class="text-sm text-muted" style="white-space:pre-wrap;line-height:1.6">${comp.raw_text.slice(0, 1200)}</div>
+    ` : ''}
+  `;
+}
+
+function closeModal(e) { if (e.target.id === 'comp-modal') document.getElementById('comp-modal').classList.add('hidden'); }
+
+// ─── Export ──────────────────────────────────────────────
+function downloadExport(format) {
+  const url = `/api/v1/cases/${currentCaseId}/export/${format}`;
+  toast(`Downloading ${format.toUpperCase()}…`, 'info');
+  window.open(url, '_blank');
+}
+
+// ─── Init ────────────────────────────────────────────────
+checkApi();
+loadDashboard();
+</script>
+</body>
+</html>

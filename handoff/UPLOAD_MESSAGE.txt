@@ -1,0 +1,9 @@
+Continue the existing Mizan project in the attached public repository source ZIP or linked GitHub repository.
+
+Open the repository root and read 00_START_HERE.md, then handoff/CURRENT_STATE.md, handoff/FILE_MAP.md and handoff/UPGRADE_PROMPT.md. Treat the upgrade prompt as my implementation brief, subject to my latest instructions.
+
+The priority is a materially better map-first interface with real satellite/hybrid imagery inside the application, synchronized comparable evidence, spatial selection and a professional valuation inspector. A basic road map or a Google Maps link does not fulfill the imagery requirement.
+
+Inspect and extend the active application in Projects/Muqayyim-Downloads. Reuse the preserved calculation engines and working workflow. Do not rebuild the project from scratch, fabricate market data or claim unconfigured imagery features are complete.
+
+First give a concise assessment and provider choice, then implement the brief incrementally. Keep useful existing work, data provenance, input/history protections and tests. Follow handoff/SETUP_AND_TESTS.md; private credentials/databases and installed dependencies are intentionally excluded from this transfer.

@@ -1,0 +1,61 @@
+# Private configuration and authentication
+**/.env
+**/.env.*
+!**/.env.example
+**/*session*.json
+**/*cookie*.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.har
+
+# Private databases, uploads, generated datasets and model artifacts
+**/*.db
+**/*.db-*
+**/*.sqlite*
+**/storage/
+**/data/raw/
+Projects/Mizan-Desktop/models/
+Projects/Mizan-Antigravity/models/
+Projects/Mizan-Desktop/reports/
+Projects/Mizan-Antigravity/reports/
+**/*.csv
+**/*.xlsx
+**/*.xls
+**/*.parquet
+**/*.joblib
+**/*.docx
+**/*.png
+Projects/Mizan-Desktop/Data real estate/
+
+# Installed dependencies and generated output
+**/.venv/
+**/venv/
+**/node_modules/
+**/.next/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/*.egg-info/
+**/*.pyc
+**/*.tsbuildinfo
+**/*.log
+**/.DS_Store
+**/dist/
+**/build/
+deliverables/
+
+# Local discovery/history and material without reviewed redistribution rights
+Backups/
+Related-Materials-To-Review/
+Saved-Pages/
+Screenshots/
+Projects/Muqayyim-OpenClaw/
+ORIGINAL-LOCATIONS.tsv
+move-history.json
+collection-manifest.json
+COLLECTION-NOTES.txt
+docs/pre-phase1-inventory.json
+handoff/PACKAGE_VERIFICATION.json

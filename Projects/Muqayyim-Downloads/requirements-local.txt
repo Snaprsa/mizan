@@ -1,0 +1,20 @@
+# Local API / verification runtime. Broader worker/production dependencies remain in api/pyproject.toml.
+fastapi>=0.109,<1
+uvicorn[standard]>=0.27,<1
+sqlalchemy[asyncio]>=2.0.25,<3
+aiosqlite>=0.20,<1
+alembic>=1.13,<2
+pydantic>=2.5,<3
+pydantic-settings>=2.1,<3
+python-multipart>=0.0.6,<1
+python-jose[cryptography]>=3.3,<4
+httpx>=0.26,<1
+beautifulsoup4>=4.12,<5
+lxml>=5.1,<7
+pdfplumber>=0.10,<1
+openpyxl>=3.1,<4
+reportlab>=4,<6
+python-dateutil>=2.8,<4
+hijri-converter>=2.3,<3
+pytest>=7.4,<10
+pytest-asyncio>=0.23,<2
