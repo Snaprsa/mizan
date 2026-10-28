@@ -4,7 +4,7 @@ Public-source preparation inspected 28 October 2026. Newer sensitivity, ownershi
 
 ## Product and entry point
 
-Saudi real-estate valuation, underwriting and investment intelligence. Primary workflow: map → subject location → property type → approach → sourced inputs → calculation → saved results. The user now specifically requests real satellite/hybrid imagery and a substantially improved professional map-first interface. That upgrade is specified, not yet implemented.
+Saudi real-estate valuation, underwriting and investment intelligence. Primary workflow: map → subject location → property type → approach → sourced inputs → calculation → saved results. A map-first workspace with a Google Maps JavaScript API imagery provider was implemented on 28 October 2026. Live satellite imagery has **not** been verified: no Google key is configured on this machine, so the app currently runs the labelled OpenStreetMap road-map fallback. See `handoff/CONTINUATION_LOG.md`.
 
 The active application is `Projects/Muqayyim-Downloads`. Keep this relative path and the sibling Mizan-Antigravity engine until intentionally refactoring and testing them. Other preserved projects are not additional primary apps to launch.
 
@@ -16,7 +16,7 @@ The active application is `Projects/Muqayyim-Downloads`. Keep this relative path
 | Backend | FastAPI, Pydantic, async SQLAlchemy, Alembic; REST under `/api/v1`; health at `/api/health` |
 | Local database | SQLite runtime `Projects/Muqayyim-Downloads/storage/mizan.db`; legacy database cloned/recovered for local startup if present; backups before startup migration |
 | Deployment direction | PostgreSQL-oriented schema/migrations; PostGIS and institutional operations not yet implemented/verified |
-| Map | Leaflet/OpenStreetMap road tiles, grid clusters, subject pin/radius, layers, date/city/type/text filters, viewport counts and adjacent evidence list; Google Maps outbound links |
+| Map | Full-bleed workspace: slim header with coordinate/saved-record/Google-geocoding search, collapsible layers & filters (type, date, status, source, location precision, reliability), central map with tools, resizable inspector (Evidence / Subject / Valuation / Coverage) and optional linked table. Provider boundary: Google Maps JS API (satellite/hybrid/road/terrain, Geocoder, Street View with provider-reported capture dates, rotate/tilt only on vector maps) when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is set; otherwise, or on Google auth failure, a labelled Leaflet/OSM road-map fallback. Subject pin place/drag/arrow-key nudge/confirm, polygon and radius search areas (editable), approximate site outline saved to the property as GeoJSON with `cadastral: false`, geodesic distance/area measurement, fit subject/evidence, north reset, fullscreen. State (camera, basemap, subject, geometry, selection, layers, filters, panels) persists in localStorage. `/map/records` accepts viewport bounds and returns precision labels; the UI switches to bounded viewport queries only when results are truncated. |
 | Properties | Identity/geography plus validated land/planning/building/financial/provenance sections; owner scope; case link; optimistic revision checks |
 | Assumptions | Explicit value/unit/category/source/date/status/override; stored history and immutable property input snapshots |
 | Market data | Provider-neutral source registry, append-only normalized observations, JSON/CSV import with duplicate/conflict checks; unverified local dataset inventory |
@@ -30,7 +30,7 @@ The active application is `Projects/Muqayyim-Downloads`. Keep this relative path
 
 ## Real limitations
 
-There is no embedded satellite/hybrid imagery, Google SDK map, complete geocoding/parcel service, authorized planning lookup, complete GIS, calibrated AVM, connected public transaction feed, full debt/HBU/development workflow, institutional portfolio/reporting/collaboration or complete bilingual translation.
+Satellite imagery is implemented but unverified pending a Google key. There is no parcel/cadastral service, authorized planning lookup, complete GIS, calibrated AVM, connected public transaction feed, full debt/HBU/development workflow, institutional portfolio/reporting/collaboration or complete bilingual translation.
 
 The five connected methods are initial indications, not the complete original platform specification. Sales uses an unadjusted median from at least three distinct, active, dated, nearby achieved transactions of the same property type. DCF is annual and unlevered. Residual land is static. Legacy heuristic confidence/ranges are not exposed as calibrated confidence.
 
@@ -49,6 +49,9 @@ The owner's local collection retains candidate datasets and original-location hi
 - Test data belongs only in isolated fixtures/databases.
 
 ## Verification
+
+Map upgrade, 28 October 2026: 97 backend tests, 15 frontend tests (including coordinate-order, geodesic, clustering with a 10,000-point synthetic fixture and persisted-state validation), lint, type-check and production build passed locally. Browser checks used synthetic fixtures in a disposable API on 8100 and the OSM fallback; an intentionally invalid Google key confirmed the auth-failure fallback. Not verified: real Google satellite/hybrid/terrain tiles, geocoding, Street View, vector rotation/tilt.
+
 
 The public-source preparation run passed 93 backend tests on 28 October, including the portable migration fixture, sensitivity, ownership and experimental HBU utility tests. The prior full recheck passed 7 frontend tests and a production build; publication checks rerun the relevant commands on an export of committed source. CI results are the current reference for a clean Linux installation.
 

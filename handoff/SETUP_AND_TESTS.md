@@ -28,9 +28,26 @@ For a controlled migration of actual private data, the owner must transfer their
 
 ## Configuration
 
-The current no-key basemap uses Leaflet/OpenStreetMap. Existing build-time tile configuration is `NEXT_PUBLIC_MAP_TILE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`. Existing backend settings are defined in `api/app/config.py`.
+### Map imagery (Google Maps JavaScript API)
 
-The blank active-app `.env.example` and `handoff/templates/` show placeholders. Proposed Google imagery variables in the provider notes are requirements for the future upgrade, not proof that the current app loads Google's SDK.
+Frontend variables are inlined at build time. Put them in `Projects/Muqayyim-Downloads/frontend/.env.local` (ignored by Git), then run `npm run build` and restart the launcher.
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Required for satellite/hybrid/road/terrain imagery. Use a **browser key restricted** to HTTP referrers (e.g. `http://127.0.0.1:3100/*`, `http://localhost:3100/*`) and to the APIs below. |
+| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | Optional. A *vector* Map ID enables heading/tilt where Google supports it. Without it, rotate/tilt stay disabled. |
+| `NEXT_PUBLIC_MAP_PROVIDER` | `google` (default) or `leaflet` to force the road-map fallback. |
+| `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_ATTRIBUTION` | Fallback road tiles (default OpenStreetMap). Never presented as satellite imagery. |
+
+In Google Cloud: create/choose a project with **billing enabled**, enable **Maps JavaScript API** (imagery, Street View panoramas) and **Geocoding API** (address search), then create the restricted key. Usage is billed per Google's current SKU pricing; check the Google Maps Platform pricing page rather than any figure in this repo. Not used: the retired Drawing library, the legacy `Marker`, 45° raster imagery, Places, photorealistic 3D tiles.
+
+If the key is missing, invalid, referrer-restricted or billing is disabled, Google calls `gm_authFailure`; Mizan then switches to the labelled road map with the reason shown and keeps all selections, geometry and unsaved inputs. "Ready" is reported only after Google imagery tiles actually load. Google does not expose satellite capture dates through this API, so none are shown; Street View shows the provider-reported panorama date when present.
+
+Verifying live imagery: after configuring the key, open `/map`, choose **Satellite**, search a Saudi coordinate (e.g. `24.7136, 46.6753`) and confirm imagery, Google attribution and the absence of the fallback banner.
+
+### Other
+
+Existing backend settings are defined in `api/app/config.py`. `MIZAN_API_ORIGIN` (frontend server env) retargets the `/api` proxy (default `http://127.0.0.1:8000`). `MIZAN_NEXT_DIST_DIR` sets the Next.js build directory; use `.next-dev` for any dev server so it cannot overwrite the production build served by the launcher.
 
 Preserve `Projects/Mizan-Antigravity` alongside the active app: the current calculation adapter loads its preserved classes by relative path.
 
@@ -41,12 +58,12 @@ cd Projects/Muqayyim-Downloads
 ../../.venv/bin/python -m pytest api/tests -q
 ```
 
-Tests use isolated SQLite. The public-source preparation run passed 93 backend tests. Follow the current CI result for clean-install verification.
+Tests use isolated SQLite. The map-upgrade run on 28 October 2026 passed 97 backend tests (93 at public-source preparation). Follow the current CI result for clean-install verification.
 
 ## Frontend checks
 
 ```bash
-npm --prefix Projects/Muqayyim-Downloads/frontend run test:valuation
+npm --prefix Projects/Muqayyim-Downloads/frontend run test        # valuation-state + map workspace tests
 npm --prefix Projects/Muqayyim-Downloads/frontend run build
 ```
 

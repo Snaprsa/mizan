@@ -115,3 +115,67 @@ async def test_map_uses_reviewed_coordinate_override(client):
     r = (await client.get('/api/v1/map/records')).json()
     sale = next(x for x in r['data'] if x['title'] == 'Recorded sale')
     assert sale['coordinates'] == [24.75, 46.7]
+
+
+@pytest.mark.asyncio
+async def test_map_viewport_bounds_use_latitude_longitude_order(client):
+    await seed(client)
+    # Box around the Riyadh points only: latitude 24.65–24.75, longitude 46.65–46.75.
+    r = await client.get('/api/v1/map/records', params={'south': 24.65, 'west': 46.65, 'north': 24.75, 'east': 46.75})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body['coordinate_order'] == '[latitude, longitude]'
+    assert {x['title'] for x in body['data']} == {'Recorded sale', 'Listing not sale'}
+    assert body['matching_filters'] == 4 and body['total'] == 2 and body['returned'] == 2
+    assert all(x['location_precision'] == 'source_reported' for x in body['data'])
+    # The same numbers in GeoJSON [longitude, latitude] order must not match.
+    swapped = await client.get('/api/v1/map/records', params={'south': 46.65, 'west': 24.65, 'north': 46.75, 'east': 24.75})
+    assert swapped.json()['total'] == 0
+    partial = await client.get('/api/v1/map/records', params={'south': 24.65, 'north': 24.75})
+    assert partial.status_code == 422
+    inverted = await client.get('/api/v1/map/records', params={'south': 25, 'west': 46, 'north': 24, 'east': 47})
+    assert inverted.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_missing_locations_keep_precision_and_stay_listed(client):
+    await seed(client)
+    body = (await client.get('/api/v1/map/records')).json()
+    missing = next(x for x in body['data'] if x['title'] == 'Missing location')
+    assert missing['coordinates'] is None and missing['location_precision'] == 'missing'
+    # Newest evidence first; undated records last.
+    dates = [x['date'] for x in body['data']]
+    assert dates[-1] is None and dates[0] == '2026-10-15'
+
+
+@pytest.mark.asyncio
+async def test_site_outline_is_geojson_and_never_cadastral(client):
+    ring = [[46.70, 24.70], [46.71, 24.70], [46.71, 24.71], [46.70, 24.70]]
+    outline = {'type': 'Polygon', 'coordinates': [ring], 'drawn_on': '2026-10-28', 'basemap': 'satellite'}
+    ok = await client.post('/api/v1/properties', json={'name': 'Outlined', 'location': {
+        'latitude': 24.705, 'longitude': 46.705, 'coordinate_source': 'map_pin',
+        'coordinate_precision': 'user_selected', 'site_outline': outline}})
+    assert ok.status_code == 201, ok.text
+    saved = ok.json()['property']['location']['site_outline']
+    assert saved['cadastral'] is False and saved['source'] == 'user_drawn'
+    assert 'not a certified cadastral' in saved['note']
+    for bad in ({**outline, 'cadastral': True},
+                {**outline, 'coordinates': [ring[:-1]]},  # unclosed ring
+                {**outline, 'coordinates': [[[24.70, 146.70], [24.71, 46.70], [24.71, 46.71], [24.70, 146.70]]]}):
+        r = await client.post('/api/v1/properties', json={'name': 'Bad', 'location': {'site_outline': bad}})
+        assert r.status_code == 422, bad
+    body = (await client.get('/api/v1/map/records')).json()
+    prop = next(x for x in body['data'] if x['kind'] == 'property')
+    assert prop['has_site_outline'] is True and prop['location_precision'] == 'user_selected'
+    assert prop['coordinate_source'] == 'map_pin'
+
+
+@pytest.mark.asyncio
+async def test_map_start_records_coordinate_provenance(client):
+    r = await client.post('/api/v1/analysis/start', json={'latitude': 24.7, 'longitude': 46.7,
+        'property_type': 'land', 'method': 'sales_comparison', 'coordinate_source': 'geocoded',
+        'coordinate_precision': 'approximate'})
+    assert r.status_code == 201, r.text
+    p = (await client.get(f"/api/v1/properties/{r.json()['property_id']}")).json()
+    assert p['property']['location']['coordinate_source'] == 'geocoded'
+    assert p['property']['location']['coordinate_precision'] == 'approximate'

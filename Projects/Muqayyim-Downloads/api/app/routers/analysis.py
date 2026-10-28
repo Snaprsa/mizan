@@ -36,7 +36,8 @@ async def start(body: StartAnalysis, db: AsyncSession = Depends(get_db), user=De
     case = Case(title=name, created_by=owner_id(user), status='draft')
     db.add(case); await db.flush()
     data = PropertyInput(name=name, case_id=case.id, property_type=body.property_type,
-        location={'latitude': body.latitude, 'longitude': body.longitude, 'city': body.city, 'district': body.district},
+        location={'latitude': body.latitude, 'longitude': body.longitude, 'city': body.city, 'district': body.district,
+                  'coordinate_source': body.coordinate_source, 'coordinate_precision': body.coordinate_precision},
         provenance={'source': 'User-selected map location', 'collected_on': today},
         analysis={'method': body.method, 'as_of': today}).model_dump(mode='json')
     p = Property(data=data, created_by=owner_id(user), **search_columns(data))

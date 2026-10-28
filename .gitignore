@@ -59,3 +59,9 @@ collection-manifest.json
 COLLECTION-NOTES.txt
 docs/pre-phase1-inventory.json
 handoff/PACKAGE_VERIFICATION.json
+
+# Machine-specific Claude continuation context
+/handoff/CLAUDE_LOCAL_HANDOFF.md
+/.claude/settings.local.json
+/.claude/worktrees/
+**/.next-dev/

@@ -114,7 +114,8 @@ async def prepare(db, p, user, method=None):
         fields.append(f)
     # Reuse the existing owner-scoped map projection and all reviewed field overrides.
     evidence = await map_records(q='', city=None, district=None, property_type=None, case_id=None,
-        date_from=None, date_to=None, include_invalid=False, limit=5000, db=db, user=user)
+        date_from=None, date_to=None, include_invalid=False, limit=5000,
+        south=None, west=None, north=None, east=None, db=db, user=user)
     location = p.data.get('location', {})
     coords = [location.get('latitude'), location.get('longitude')]
     candidates, eligible, seen = [], [], set()

@@ -200,13 +200,18 @@ export type MapRecord = {
   area_sqm: number | null; price_per_sqm: number | null; source: string;
   reliability_score: number | null; case_id: string | null; href: string;
   metric?: string; value?: unknown; unit?: string; reliability_percent?: number;
+  /** source_reported | user_selected | rooftop | approximate | area | missing | … — never upgraded by the UI. */
+  location_precision?: string; coordinate_source?: string | null; has_site_outline?: boolean;
 };
 export type MapResponse = { data: MapRecord[]; total: number; truncated: boolean;
+  returned?: number; matching_filters?: number; bbox?: { south: number; west: number; north: number; east: number } | null;
+  /** Records use [latitude, longitude]; GeoJSON geometry uses [longitude, latitude]. */
+  coordinate_order?: string;
   coverage?: { properties: number; comparables: number; market_observations: number; missing_location: number; unverified_datasets: number; datasets: LocalDataset[] };
   available: { cities: string[]; property_types: string[] };
   counts: { mapped: number; missing_location: number; transactions: number; listings: number; properties: number };
   scope: string };
-export const getMapRecords = (filters: Record<string, string>) => request<MapResponse>(`/api/v1/map/records?${new URLSearchParams(Object.entries(filters).filter(([, value]) => !!value))}`);
+export const getMapRecords = (filters: Record<string, string>, init?: { signal?: AbortSignal }) => request<MapResponse>(`/api/v1/map/records?${new URLSearchParams(Object.entries(filters).filter(([, value]) => !!value))}`, init);
 
 export type ValuationField = { key: string; label: string; unit: string; minimum: number; maximum: number | null; positive: boolean;
   value: number | null; source: string | null; as_of: string | null; origin: string | null; assumption_status?: string; state: string; error: string | null };
@@ -219,7 +224,8 @@ export type AnalysisResult = { inputs?: ValuationField[]; comparables?: Candidat
   outputs: { value: number; currency: string; confidence: number | null; calculation_version: string; evidence: Record<string, unknown>; limitations: string[]; sensitivity?: { x: { label: string; unit: string; values: number[] }; y: { label: string; unit: string; values: number[] }; cells: { value: number | null; reason: string | null }[][]; notice: string } | null } };
 export type AnalysisInput = { value: number; source: string; as_of: string; notes?: string; status?: string };
 export const getValuationCatalog = () => request<{ methods: ValuationMethod[]; property_types: string[] }>("/api/v1/analysis/catalog");
-export const startMapAnalysis = (body: { latitude: number; longitude: number; property_type: string; method: string; name?: string; city?: string; district?: string }) => request<PreparedAnalysis>("/api/v1/analysis/start", { method: "POST", body: JSON.stringify(body) });
+export const startMapAnalysis = (body: { latitude: number; longitude: number; property_type: string; method: string; name?: string; city?: string; district?: string;
+  coordinate_source?: "map_pin" | "coordinate_entry" | "geocoded" | "imported" | "manual"; coordinate_precision?: "user_selected" | "rooftop" | "range_interpolated" | "geometric_center" | "approximate" }) => request<PreparedAnalysis>("/api/v1/analysis/start", { method: "POST", body: JSON.stringify(body) });
 export const prepareAnalysis = (id: string, method?: string) => request<PreparedAnalysis>(`/api/v1/analysis/${id}${method ? `?method=${encodeURIComponent(method)}` : ""}`);
 export const saveAnalysisInputs = (id: string, body: { expected_revision: number; method: string; inputs: Record<string, AnalysisInput>; as_of: string; radius_km: number; lookback_days: number }) => request<PreparedAnalysis>(`/api/v1/analysis/${id}/inputs`, { method: "PUT", body: JSON.stringify(body) });
 export const calculateAnalysis = (id: string, expected_revision: number) => request<AnalysisResult>(`/api/v1/analysis/${id}/runs`, { method: "POST", body: JSON.stringify({ expected_revision }) });

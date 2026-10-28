@@ -9,6 +9,37 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False, str_strip_whitespace=True)
 
 
+SITE_OUTLINE_NOTE = ('User-drawn outline on provider imagery. Approximate; not a certified cadastral, '
+                     'title-deed or municipal boundary.')
+
+
+class SiteOutline(StrictModel):
+    """GeoJSON (RFC 7946) polygon. Positions are [longitude, latitude], unlike map records."""
+    type: Literal['Polygon'] = 'Polygon'
+    coordinates: list[list[list[float]]] = Field(min_length=1, max_length=1)
+    source: Literal['user_drawn'] = 'user_drawn'
+    cadastral: Literal[False] = False
+    drawn_on: date
+    basemap: str | None = Field(None, max_length=50)
+    approximate_area_sqm: float | None = Field(None, gt=0)
+    note: str = SITE_OUTLINE_NOTE
+
+    @model_validator(mode='after')
+    def valid_ring(self):
+        ring = self.coordinates[0]
+        if len(ring) < 4 or len(ring) > 500:
+            raise ValueError('An outline ring needs between 3 and 499 distinct vertices')
+        for position in ring:
+            if len(position) != 2:
+                raise ValueError('GeoJSON positions must be [longitude, latitude]')
+            lng, lat = position
+            if not (-180 <= lng <= 180 and -90 <= lat <= 90):
+                raise ValueError('GeoJSON positions must be [longitude, latitude] within valid ranges')
+        if ring[0] != ring[-1]:
+            raise ValueError('A GeoJSON polygon ring must be closed (first position repeated last)')
+        return self
+
+
 class Location(StrictModel):
     address: str | None = None
     city: str | None = None
@@ -19,6 +50,11 @@ class Location(StrictModel):
     plot_number: str | None = None
     block_number: str | None = None
     plan_number: str | None = None
+    # How the coordinates were obtained; precision is never upgraded beyond what the source supports.
+    coordinate_source: Literal['map_pin', 'coordinate_entry', 'geocoded', 'imported', 'manual'] | None = None
+    coordinate_precision: Literal['user_selected', 'rooftop', 'range_interpolated', 'geometric_center',
+                                  'approximate'] | None = None
+    site_outline: SiteOutline | None = None
 
     @model_validator(mode='after')
     def coordinates(self):

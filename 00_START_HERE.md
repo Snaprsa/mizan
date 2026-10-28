@@ -2,6 +2,10 @@
 
 Prepared 28 October 2026. This is one consolidated workspace containing one active platform, two reusable Mizan engines and preserved earlier prototypes.
 
+## Claude Code locally
+
+Start Claude Code from the consolidated repository root. Read `CLAUDE.md` and `handoff/CLAUDE_CONTINUATION.md` for the full execution brief; `handoff/CLAUDE_LOCAL_HANDOFF.md`, when present, supplies this Mac's exact paths and runtime snapshot and is intentionally excluded from public Git. The former app-level instruction file is preserved under its `docs/archive/` folder as a historical reference.
+
 ## For another LLM or developer
 
 1. Read `handoff/CURRENT_STATE.md` for what actually works and what does not.

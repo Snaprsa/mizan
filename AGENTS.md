@@ -6,7 +6,7 @@
 - Reused valuation engine: `Projects/Mizan-Antigravity/src/mizan_engine/approaches`. Its sibling location is required by the current adapter. Preserve relative paths until deliberately migrating and testing the adapter.
 - `Projects/Mizan-Desktop`, `Projects/Qaim`, `Projects/Muqayyim-OpenClaw` and `Backups` are preserved legacy/reference work. Do not launch them as the primary platform or merge their data blindly.
 - Inspect existing code and reuse working ingestion, citations, overrides, property revisions, valuation calculations and tests. Make incremental changes; no wholesale rebuild.
-- Current map is basic Leaflet/OpenStreetMap. Satellite/hybrid imagery, advanced map UX and complete GIS are requested work, not existing features.
+- The map workspace uses a Google Maps JavaScript API provider with a labelled Leaflet/OpenStreetMap road-map fallback. Live satellite imagery is unverified until a restricted key is configured; complete GIS (parcels, zoning, PostGIS) is still requested work. See `handoff/CONTINUATION_LOG.md`.
 - Read `handoff/UPGRADE_PROMPT.md` when implementing the map/UI upgrade. Check current provider documentation and deprecations before using an API.
 - No fabricated market transactions, parcel boundaries, imagery dates, planning rules, confidence scores or predictions. Preserve observed values, user assumptions and provenance separately.
 - Private databases, credentials, auth sessions and installed dependencies are intentionally absent from the transfer archive. Fresh startup is empty; never auto-seed plausible market data to conceal missing coverage.

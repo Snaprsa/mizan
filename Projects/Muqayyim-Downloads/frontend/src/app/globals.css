@@ -39,3 +39,25 @@
 
 .mizan-map-icon span { display:flex; width:34px; height:34px; align-items:center; justify-content:center; border:2px solid white; border-radius:50%; color:white; font-size:12px; font-weight:600; box-shadow:0 1px 5px #0004; }
 .leaflet-container { font-family: inherit; }
+
+/* Map workspace: markers shared by the Google and Leaflet renderers. */
+.mizan-overlay-root { position:absolute; left:0; top:0; }
+.mizan-overlay-root > * { position:absolute; transform:translate(-50%, -50%); }
+.mizan-leaflet-icon { background:none; border:none; }
+.mizan-marker, .mizan-subject { display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%;
+  border:2px solid #fff; color:#fff; font:600 11px/1 Inter, system-ui, sans-serif; box-shadow:0 1px 4px rgb(0 0 0 / .45); cursor:pointer; padding:0; }
+.mizan-marker--cluster { width:36px; height:36px; font-size:12px; }
+.mizan-marker:focus-visible, .mizan-subject:focus-visible { outline:3px solid #fde047; outline-offset:2px; }
+.mizan-marker.is-selected { outline:3px solid #38bdf8; outline-offset:2px; z-index:5; }
+.mizan-marker.is-grouped { outline:2px dashed #38bdf8; outline-offset:2px; }
+.mizan-subject { width:36px; height:36px; background:#1e3a8a; border:3px solid #fde047; font-size:13px; z-index:10; touch-action:none; }
+.mizan-subject.is-confirmed { border-color:#fff; background:#1d4ed8; }
+.mizan-subject.is-draggable { cursor:grab; }
+.mizan-subject.is-dragging { cursor:grabbing; opacity:.85; }
+.mizan-vertex { display:block; width:10px; height:10px; border-radius:50%; background:#fff; border:2px solid #0284c7; pointer-events:none; }
+.mizan-tool { @apply inline-flex items-center justify-center h-8 min-w-8 px-2 rounded text-xs font-medium text-slate-700 bg-white/95 border border-slate-300 shadow-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500; }
+.mizan-tool[aria-pressed="true"] { @apply bg-blue-700 text-white border-blue-700; }
+.mizan-chip { @apply inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600; }
+.mizan-tab { @apply px-3 py-2 text-xs font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-800; }
+.mizan-tab[aria-selected="true"] { @apply text-blue-700 border-blue-700; }
+.mizan-compact-input { @apply block w-full border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500; }

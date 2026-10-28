@@ -13,6 +13,9 @@ class StartAnalysis(StrictModel):
     name: str | None = Field(None, max_length=255)
     city: str | None = None
     district: str | None = None
+    coordinate_source: Literal['map_pin', 'coordinate_entry', 'geocoded', 'imported', 'manual'] = 'map_pin'
+    coordinate_precision: Literal['user_selected', 'rooftop', 'range_interpolated', 'geometric_center',
+                                  'approximate'] = 'user_selected'
 
 
 class AnalysisValue(StrictModel):

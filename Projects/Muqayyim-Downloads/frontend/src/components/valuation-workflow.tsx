@@ -7,8 +7,10 @@ import SensitivityTable from "./sensitivity-table";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
-export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence }: {
+export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0 }: {
   propertyId: string; methods: ValuationMethod[]; onPrepared: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void;
+  /** Increment after another screen changes the property (e.g. map geometry) to adopt its new revision. */
+  refreshKey?: number;
 }) {
   const [prepared, setPrepared] = useState<PreparedAnalysis | null>(null); const [method, setMethod] = useState("");
   const [draft, setDraft] = useState<Draft>({}); const [radius, setRadius] = useState("3"); const [lookback, setLookback] = useState("365"); const [asOf, setAsOf] = useState("");
@@ -41,6 +43,17 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
     return d?.value !== "" && !!d?.source.trim() && !!d?.as_of && Number.isFinite(value) && value >= f.minimum &&
       (!f.positive || value > 0) && (f.maximum == null || value <= f.maximum) && (f.key !== "holding_years" || Number.isInteger(value));
   }) && !!asOf && Number(radius) >= 0.1 && Number(radius) <= 50 && Number(lookback) >= 1 && Number(lookback) <= 3650;
+  // Re-prepare from the server; fills untouched blanks and keeps the user's unsaved edits.
+  const refresh = useCallback(() => prepareAnalysis(propertyId, method || undefined).then(p => {
+    setPrepared(p); setDraft(previous => Object.fromEntries(p.fields.map(f => {
+      const existing = previous[f.key];
+      return [f.key, !existing || (existing.value === "" && existing.source === "" && existing.as_of === "")
+        ? { value: f.value == null ? "" : String(f.value), source: f.source || "", as_of: f.as_of || "" }
+        : existing];
+    }))); onPrepared(p); setError("");
+  }).catch(e => setError(e.message)), [propertyId, method, onPrepared]);
+  const lastRefreshKey = useRef(refreshKey);
+  useEffect(() => { if (refreshKey !== lastRefreshKey.current) { lastRefreshKey.current = refreshKey; refresh(); } }, [refreshKey, refresh]);
   const perform = useCallback(async (shouldCalculate: boolean) => {
     if (!prepared || busy) return;
     processed.current = signature; setBusy(true); setError(""); setNotice("");
@@ -96,14 +109,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
         <p className="text-[10px] text-slate-500">{f.origin === "market_observation" ? "Filled from a matching source observation; source and date are recorded." : f.origin ? `Filled from ${f.origin.replaceAll("_", " ")}.` : "Missing from saved evidence. Supply a sourced value or explicit user assumption."}</p>
       </div>)}
     </div>
-    <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="text-xs px-3 py-2 border rounded disabled:opacity-50" onClick={() => perform(false)}>Save inputs</button><button type="button" disabled={busy || !complete} className="mizan-button !text-xs" onClick={() => perform(true)}>{busy ? "Processing…" : "Calculate now"}</button><button type="button" className="text-xs text-blue-700" disabled={busy} onClick={() => prepareAnalysis(propertyId, method).then(p => {
-      setPrepared(p); setDraft(previous => Object.fromEntries(p.fields.map(f => {
-        const existing = previous[f.key];
-        return [f.key, !existing || (existing.value === "" && existing.source === "" && existing.as_of === "")
-          ? { value: f.value == null ? "" : String(f.value), source: f.source || "", as_of: f.as_of || "" }
-          : existing];
-      }))); onPrepared(p); setError("");
-    }).catch(e => setError(e.message))}>Refresh evidence</button></div>
+    <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="text-xs px-3 py-2 border rounded disabled:opacity-50" onClick={() => perform(false)}>Save inputs</button><button type="button" disabled={busy || !complete} className="mizan-button !text-xs" onClick={() => perform(true)}>{busy ? "Processing…" : "Calculate now"}</button><button type="button" className="text-xs text-blue-700" disabled={busy} onClick={refresh}>Refresh evidence</button></div>
     {notice && <p role="status" className="text-xs text-green-800">{notice}</p>}
     {!!prepared.gaps.length && <details open className="bg-amber-50 p-3 rounded text-xs text-amber-900"><summary className="font-medium cursor-pointer">Still required / last saved readiness</summary><ul className="list-disc pl-4 mt-2 space-y-1">{prepared.gaps.map(g => <li key={g}>{g}</li>)}</ul></details>}
     <details className="text-xs" open={method === "sales_comparison"}><summary className="font-medium cursor-pointer">Nearby evidence: {prepared.candidates.length} records · {prepared.eligible_comparables.length} eligible achieved sales</summary><p className="text-slate-500 mt-2">Within {prepared.radius_km} km. Listings and draft / undated / repeated evidence are not used as achieved sales.</p><div className="max-h-48 overflow-auto mt-2 space-y-2">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block text-left border rounded p-2 w-full" onClick={() => onSelectEvidence(c.id)}><span className="font-medium">{c.title}</span><span className="block text-slate-500">{c.distance_km} km · {c.eligible ? "Eligible achieved sale" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="text-slate-500">No located comparable evidence in this radius.</p>}</div></details>

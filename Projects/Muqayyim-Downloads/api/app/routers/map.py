@@ -32,6 +32,16 @@ def number(value):
         return None
 
 
+def in_bbox(coords, south, west, north, east):
+    """Coordinates are [latitude, longitude]. A west > east box crosses the antimeridian."""
+    if coords is None:
+        return False
+    lat, lng = coords
+    if not south <= lat <= north:
+        return False
+    return west <= lng <= east if west <= east else (lng >= west or lng <= east)
+
+
 def coordinates(lat, lng):
     lat, lng = number(lat), number(lng)
     if lat is None or lng is None or not (-90 <= lat <= 90 and -180 <= lng <= 180):
@@ -44,9 +54,17 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
         district: str | None = None, property_type: str | None = None,
         case_id: uuid.UUID | None = None, date_from: date | None = None, date_to: date | None = None,
         include_invalid: bool = False, limit: int = Query(5000, ge=1, le=5000),
+        south: float | None = Query(None, ge=-90, le=90), west: float | None = Query(None, ge=-180, le=180),
+        north: float | None = Query(None, ge=-90, le=90), east: float | None = Query(None, ge=-180, le=180),
         db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     if date_from and date_to and date_from > date_to:
         raise HTTPException(422, 'Start date must not be after end date')
+    bbox = (south, west, north, east)
+    if any(v is not None for v in bbox) and any(v is None for v in bbox):
+        raise HTTPException(422, 'Viewport bounds need south, west, north and east together')
+    if south is not None and south > north:
+        raise HTTPException(422, 'South bound must not be north of the north bound')
+    bbox = bbox if south is not None else None
     records = []
     # Scope both endpoints of the legacy case/comparable relationship to the caller.
     comps = (await db.execute(select(Comparable, Source.url, Source.file_name)
@@ -86,6 +104,7 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
             'title': value('property_title') or 'Untitled comparable', 'city': value('city'),
             'district': value('district'), 'property_type': value('property_type'),
             'coordinates': coordinates(value('latitude'), value('longitude')),
+            'location_precision': 'source_reported' if coordinates(value('latitude'), value('longitude')) else 'missing',
             'date': observed, 'date_basis': 'transaction_date' if kind == 'transaction' else 'listing_date',
             'evidence_type': evidence, 'status': c.status, 'price': price, 'currency': c.currency or 'SAR',
             'area_sqm': area, 'price_per_sqm': price / area if price is not None and area and area > 0 else None,
@@ -104,6 +123,10 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
         records.append({'id': 'property:'+str(p.id), 'entity_id': str(p.id), 'kind': 'property',
             'title': p.name, 'city': p.city, 'district': p.district, 'property_type': p.property_type,
             'coordinates': coordinates(loc.get('latitude'), loc.get('longitude')),
+            'location_precision': (loc.get('coordinate_precision') or 'unspecified')
+                if coordinates(loc.get('latitude'), loc.get('longitude')) else 'missing',
+            'coordinate_source': loc.get('coordinate_source'),
+            'has_site_outline': bool(loc.get('site_outline')),
             'date': iso_date(p.data.get('provenance', {}).get('collected_on')), 'date_basis': 'collected_on',
             'evidence_type': 'subject_property', 'status': 'property', 'price': price, 'currency': p.currency,
             'area_sqm': area, 'price_per_sqm': price / area if price is not None and area and area > 0 else None,
@@ -119,6 +142,7 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
             'title': o.metric.replace('_', ' ').title(), 'city': o.city, 'district': o.district,
             'property_type': o.property_type,
             'coordinates': coordinates(o.details.get('latitude'), o.details.get('longitude')) if exact else None,
+            'location_precision': o.details.get('location_precision') or ('area' if o.city or o.district else 'missing'),
             'date': iso_date(o.observed_on), 'date_basis': 'observation_date', 'evidence_type': 'market_observation',
             'status': 'source_observation', 'price': None, 'currency': 'SAR', 'area_sqm': None,
             'price_per_sqm': None, 'source': source_name, 'source_id': str(o.data_source_id),
@@ -142,7 +166,16 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
             if date_to and r['date'] > date_to.isoformat(): return False
         return True
     selected = [r for r in records if matches(r)]
+    matching_filters = len(selected)
+    if bbox:
+        selected = [r for r in selected if in_bbox(r['coordinates'], *bbox)]
+    # Newest first, undated last, stable by ID, so a truncated subset is reproducible.
+    selected.sort(key=lambda r: r['id'])
+    selected.sort(key=lambda r: r['date'] or '', reverse=True)
     return {'data': selected[:limit], 'total': len(selected), 'truncated': len(selected) > limit,
+        'returned': min(len(selected), limit), 'matching_filters': matching_filters,
+        'bbox': dict(zip(['south', 'west', 'north', 'east'], bbox)) if bbox else None,
+        'coordinate_order': '[latitude, longitude]',
         'available': {'cities': sorted({str(r['city']) for r in records if r['city']}),
                       'property_types': sorted({str(r['property_type']) for r in records if r['property_type']})},
         'coverage': coverage,

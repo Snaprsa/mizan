@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:valuation": "node --experimental-strip-types --test tests/valuation-state.test.mjs"
+    "test:valuation": "node --experimental-strip-types --test tests/valuation-state.test.mjs",
+    "test": "node --experimental-strip-types --test tests/valuation-state.test.mjs tests/map-workspace.test.mjs",
+    "test:map": "node --experimental-strip-types --test tests/map-workspace.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.0",
@@ -19,6 +21,7 @@
     "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {
+    "@types/google.maps": "^3.66.8",
     "@types/leaflet": "^1.9.20",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
