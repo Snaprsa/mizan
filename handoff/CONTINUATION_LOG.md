@@ -1,5 +1,27 @@
 # Continuation log
 
+## 2026-10-28 — Free imagery + Apple-style redesign (owner request)
+
+### Decisions
+- Owner: "must be free". Google Maps requires a billing-enabled Cloud project (developers.google.com/maps/get-started), so the Google renderer and `@types/google.maps` were removed. Imagery now uses Esri ArcGIS Location Platform's free tier (free account, no payment method; pay-as-you-go off by default so usage stops at the allowance). Static Basemap Tiles service URL format taken from Esri's own `esri-leaflet-static-basemap-tile` package source; no new runtime dependency. Endpoint confirmed live (returns 499 "Token Required" without a key).
+- Owner: interface "should be way better, simpler, like Apple". Map page is now full-screen with one floating card (bottom sheet on phones) showing one thing at a time; navigation moved to a menu button; quiet glass controls; system font; Apple system colours.
+
+### Completed behaviour
+- `map-provider.ts`: Esri tile URLs, `/self` style listing (gates Satellite/Hybrid/Standard/Terrain), attribution from the service's `copyrightText`, Esri geocoding (country SAU, not stored, results only move the map + temporary blue marker), OSM fallback with reason.
+- `map-renderer.tsx`: single Leaflet renderer (replaces google/leaflet renderers + map-canvas); handle passed as a prop (`next/dynamic` doesn't forward refs — this had broken zoom/fit in the first draft); camera reported on zoomend.
+- `app/map/page.tsx` redesign: Explore (Value a property button, Sales/Listings/Properties tiles with median SAR/m², In view/All segmented control, evidence list, Data to review), record detail (grouped rows), Value a property (Location → Property type chips → Approach → Start), Filters (switches, period segmented control, place/type, quality), Data to review, open valuation (headline value first). Map style popover, Tools popover (search area, outline, measure, radius), show pin, show evidence, table, full screen, zoom. First visit frames the evidence.
+- Valuation component: settings and per-input sources folded into disclosures; headline estimated value at the top; sales description updated.
+- App shell: no sidebar on /map.
+
+### Tests (28 Oct 2026)
+- Backend 104 passed. Frontend 17 passed (+ Esri tile URL / geocode coordinate order / key error). Lint, type-check, production build pass.
+- Browser (synthetic fixtures, disposable API :8100, dev :3101 `.next-dev`): explore, flow (pin by tap and by typed coordinates, confirm, type, approach, start), auto-calculated value, zoom/camera persistence, phone layout. Screenshots 06–09 (local).
+- Not verified: live Esri imagery, terrain, geocoding — no key on this machine.
+
+### Next step
+Owner creates the free Esri key (steps in SETUP_AND_TESTS.md) → rebuild → verify satellite at a Riyadh coordinate. Then structured comparable attributes and cross-method reconciliation.
+
+
 ## 2026-10-28 — Increment B (part 1): professional comparable adjustment grid
 
 ### Completed behaviour

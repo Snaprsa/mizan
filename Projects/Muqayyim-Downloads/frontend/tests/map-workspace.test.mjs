@@ -105,3 +105,20 @@ test('persisted workspace state is validated and survives round trips', () => {
   assert.equal(hostile.subject.confirmed, false);
   assert.deepEqual(sanitizeState({ version: 2 }), defaultState());
 });
+
+test('Esri provider: tile URL shape and geocode x/y become [latitude, longitude]', async () => {
+  const { esriTileUrl, esriGeocode, ESRI_STYLES } = await import('../src/lib/map-provider.ts');
+  assert.equal(esriTileUrl('arcgis/imagery', 'k&y'),
+    'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/imagery/static/tile/{z}/{y}/{x}?token=k%26y');
+  assert.equal(ESRI_STYLES.hybrid.overlay, 'arcgis/imagery/labels');
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => ({ json: async () => (String(url).includes('countryCode=SAU')
+    ? { candidates: [{ address: 'Olaya St, Riyadh', location: { x: 46.68, y: 24.69 }, score: 98, attributes: { Addr_type: 'StreetName' } }] } : {}) });
+  try {
+    const [r] = await esriGeocode('Olaya', 'key');
+    assert.deepEqual(r.coordinates, [24.69, 46.68]);
+    assert.equal(r.precision, 'StreetName');
+    globalThis.fetch = async () => ({ json: async () => ({ error: { code: 498, message: 'Invalid token' } }) });
+    await assert.rejects(esriGeocode('Olaya', 'bad'), /not enabled for this Esri key/);
+  } finally { globalThis.fetch = realFetch; }
+});

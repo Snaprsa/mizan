@@ -28,22 +28,18 @@ For a controlled migration of actual private data, the owner must transfer their
 
 ## Configuration
 
-### Map imagery (Google Maps JavaScript API)
+### Map imagery — free (Esri ArcGIS Location Platform)
 
-Frontend variables are inlined at build time. Put them in `Projects/Muqayyim-Downloads/frontend/.env.local` (ignored by Git), then run `npm run build` and restart the launcher.
+Decision (28 Oct 2026, owner requirement "must be free"): Google Maps needs a billing-enabled Cloud project, so it was removed. Mizan uses Esri's ArcGIS Location Platform **free tier**: a free account, no payment method needed; pay-as-you-go stays disabled, so usage stops at the monthly allowance instead of being billed (Esri listed 2,000,000 basemap tiles and 20,000 geocode searches per month at the time — check location.arcgis.com/pricing for current figures).
 
-| Variable | Purpose |
-|---|---|
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Required for satellite/hybrid/road/terrain imagery. Use a **browser key restricted** to HTTP referrers (e.g. `http://127.0.0.1:3100/*`, `http://localhost:3100/*`) and to the APIs below. |
-| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | Optional. A *vector* Map ID enables heading/tilt where Google supports it. Without it, rotate/tilt stay disabled. |
-| `NEXT_PUBLIC_MAP_PROVIDER` | `google` (default) or `leaflet` to force the road-map fallback. |
-| `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_ATTRIBUTION` | Fallback road tiles (default OpenStreetMap). Never presented as satellite imagery. |
+1. Sign up at https://location.arcgis.com (free). Do not enable pay-as-you-go.
+2. Create an API key credential with the **Basemaps** privilege (static basemap tiles) and, for address search, **Geocoding (not stored)**. Restrict its referrers to `http://127.0.0.1:3100/*` and `http://localhost:3100/*`.
+3. Put it in `Projects/Muqayyim-Downloads/frontend/.env.local` (ignored by Git): `NEXT_PUBLIC_ARCGIS_API_KEY=...`
+4. `npm --prefix Projects/Muqayyim-Downloads/frontend run build`, then restart the launcher.
 
-In Google Cloud: create/choose a project with **billing enabled**, enable **Maps JavaScript API** (imagery, Street View panoramas) and **Geocoding API** (address search), then create the restricted key. Usage is billed per Google's current SKU pricing; check the Google Maps Platform pricing page rather than any figure in this repo. Not used: the retired Drawing library, the legacy `Marker`, 45° raster imagery, Places, photorealistic 3D tiles.
+Basemaps: Satellite = `arcgis/imagery`, Hybrid = `arcgis/imagery` + `arcgis/imagery/labels`, Standard = `arcgis/streets`, Terrain = `arcgis/outdoor` from the Static Basemap Tiles service. A style is offered only if the service's `/self` listing includes it for your key. Attribution ("Powered by Esri" + the service's copyright text) is read from the service and shown on the map; Esri does not report capture dates, so none are shown. Address search uses Esri World Geocoding without storage: results only move the map, and the user drops/confirms the pin themselves.
 
-If the key is missing, invalid, referrer-restricted or billing is disabled, Google calls `gm_authFailure`; Mizan then switches to the labelled road map with the reason shown and keeps all selections, geometry and unsaved inputs. "Ready" is reported only after Google imagery tiles actually load. Google does not expose satellite capture dates through this API, so none are shown; Street View shows the provider-reported panorama date when present.
-
-Verifying live imagery: after configuring the key, open `/map`, choose **Satellite**, search a Saudi coordinate (e.g. `24.7136, 46.6753`) and confirm imagery, Google attribution and the absence of the fallback banner.
+Without a key (or if Esri rejects it), Mizan shows OpenStreetMap road tiles with a "Standard map · satellite needs a free Esri key" note. `NEXT_PUBLIC_MAP_TILE_URL` / `NEXT_PUBLIC_MAP_ATTRIBUTION` override those fallback tiles.
 
 ### Other
 

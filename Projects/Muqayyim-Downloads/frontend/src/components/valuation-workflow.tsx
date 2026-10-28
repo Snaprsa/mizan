@@ -8,8 +8,10 @@ import AdjustmentGrid from "./adjustment-grid";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
-export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0 }: {
+export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0, embedded = false }: {
   propertyId: string; methods: ValuationMethod[]; onPrepared: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void;
+  /** Rendered inside the map card: no outer panel chrome or duplicate title. */
+  embedded?: boolean;
   /** Increment after another screen changes the property (e.g. map geometry) to adopt its new revision. */
   refreshKey?: number;
 }) {
@@ -88,14 +90,25 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
   }
   if (!prepared) return <section className="mizan-panel !p-4">{error ? <p role="alert" className="mizan-error">{error}</p> : <p role="status" className="text-sm">Gathering evidence and required inputs…</p>}</section>;
   const resultCurrent = result && savedRunMatchesPrepared(prepared, result) && preparedSignature(prepared) === signature;
-  return <section className="mizan-panel !p-4 space-y-3 border-blue-300" aria-label="Valuation workspace">
-    <div><h2 className="font-semibold text-sm">Valuation workspace</h2><p className="text-xs text-slate-500 mt-1">{prepared.property_name} · Revision {prepared.revision}</p></div>
+  return <section className={embedded ? "mizan-embedded space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/[0.05]" : "mizan-panel !p-4 space-y-3 border-blue-300"} aria-label="Valuation workspace">
+    {embedded && result && <div className="rounded-xl bg-black/[0.03] px-3 py-3">
+      <p className="text-[12px] text-black/50">{resultCurrent ? "Estimated value" : "Last saved value · inputs have changed since"}</p>
+      <p className={`text-[30px] font-semibold tracking-tight leading-tight ${resultCurrent ? "text-black/90" : "text-black/40"}`}>SAR {new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(result.outputs.value)}</p>
+      <p className="text-[12px] text-black/45">{methods.find(m => m.key === result.method)?.label || result.method} · as of {result.data_date}</p></div>}
+    {embedded && !result && <p className="rounded-xl bg-black/[0.03] px-3 py-3 text-[13px] text-black/55">{prepared.ready ? "Ready — calculating…" : `Still needed: ${prepared.gaps.length} item${prepared.gaps.length === 1 ? "" : "s"} (listed below).`}</p>}
+    {embedded ? <p className="text-[12px] text-black/40">Revision {prepared.revision}</p> : <div><h2 className="font-semibold text-sm">Valuation workspace</h2><p className="text-xs text-slate-500 mt-1">{prepared.property_name} · Revision {prepared.revision}</p></div>}
     {error && <div className="mizan-error" role="alert">{error}<button type="button" className="underline block mt-2" onClick={() => { setError(""); prepareAnalysis(propertyId, method).then(hydrate).catch(e => setError(e.message)); }}>Reload saved inputs</button></div>}
-    <label className="mizan-label">Valuation approach<select aria-label="Valuation approach" className="mizan-input" value={method} disabled={busy} onChange={e => changeMethod(e.target.value)}>{methods.map(m => <option key={m.key} value={m.key} disabled={!m.implemented}>{m.label}{!m.implemented ? " · not yet implemented" : ""}</option>)}</select></label>
-    <p className="text-xs text-slate-500">{prepared.description}</p>
-    <label className="text-xs flex gap-2 items-center"><input type="checkbox" checked={automatic} onChange={e => setAutomatic(e.target.checked)} />Calculate automatically when required inputs are complete</label>
-    <div className="grid grid-cols-2 gap-2"><label className="mizan-label">Valuation date<input className="mizan-input" type="date" value={asOf} onChange={e => { setAsOf(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence radius (km)<input className="mizan-input" type="number" min="0.1" max="50" step="0.1" value={radius} onChange={e => { setRadius(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence lookback (days)<input className="mizan-input" type="number" min="1" max="3650" value={lookback} onChange={e => { setLookback(e.target.value); setError(""); }} /></label></div>
-    <p className="text-[10px] text-slate-500">Typing a missing value marks it as a user assumption at the selected valuation date. Source and date remain editable.</p>
+    {/* Settings stay one tap away; the summary line shows their current values. */}
+    <details className="group rounded-xl bg-black/[0.03] px-3 py-2">
+      <summary className="cursor-pointer list-none text-[13px] text-black/60"><span className="font-medium text-black/80">Settings</span> · {methods.find(m => m.key === method)?.label} · {asOf} · {radius} km · {lookback} days{automatic ? " · auto" : ""}</summary>
+      <div className="mt-2 space-y-2">
+      <label className="mizan-label">Valuation approach<select aria-label="Valuation approach" className="mizan-input" value={method} disabled={busy} onChange={e => changeMethod(e.target.value)}>{methods.map(m => <option key={m.key} value={m.key} disabled={!m.implemented}>{m.label}{!m.implemented ? " · not yet implemented" : ""}</option>)}</select></label>
+      <p className="text-xs text-slate-500">{prepared.description}</p>
+      <label className="text-xs flex gap-2 items-center"><input type="checkbox" checked={automatic} onChange={e => setAutomatic(e.target.checked)} />Calculate automatically when required inputs are complete</label>
+      <div className="grid grid-cols-2 gap-2"><label className="mizan-label">Valuation date<input className="mizan-input" type="date" value={asOf} onChange={e => { setAsOf(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence radius (km)<input className="mizan-input" type="number" min="0.1" max="50" step="0.1" value={radius} onChange={e => { setRadius(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence lookback (days)<input className="mizan-input" type="number" min="1" max="3650" value={lookback} onChange={e => { setLookback(e.target.value); setError(""); }} /></label></div>
+      <p className="text-[10px] text-slate-500">Typing a missing value marks it as a user assumption at the selected valuation date. Source and date remain editable.</p>
+      </div>
+    </details>
     <div className="max-h-[480px] overflow-y-auto space-y-3 pr-1" aria-label="Approach-specific required inputs">
       {prepared.fields.map(f => <div key={f.key} className="border-t border-slate-100 pt-3 space-y-2"><label className="mizan-label">{f.label} ({f.unit})<input aria-label={f.label} className="mizan-input" type="number" step={f.key === "holding_years" ? "1" : "any"} min={f.minimum} max={f.maximum ?? undefined} value={draft[f.key]?.value ?? ""} onChange={e => {
           const previous = draft[f.key] || { value: "", source: "", as_of: "" };
@@ -106,9 +119,15 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
           setDraft({ ...draft, [f.key]: { value: raw, source, as_of: date } }); setError("");
         }} /></label>
         {f.unit === "ratio" && <p className="text-[10px] text-slate-400">Use 0.08 for 8%. Enter 0 explicitly where applicable.</p>}
-        <label className="mizan-label">Source for {f.label}<input className="mizan-input !text-xs" value={draft[f.key]?.source ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], source: e.target.value } }); setError(""); }} placeholder="Source / user assumption" /></label>
-        <label className="mizan-label">Source date for {f.label}<input className="mizan-input" type="date" value={draft[f.key]?.as_of ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], as_of: e.target.value } }); setError(""); }} /></label>
-        <p className="text-[10px] text-slate-500">{f.origin === "market_observation" ? "Filled from a matching source observation; source and date are recorded." : f.origin ? `Filled from ${f.origin.replaceAll("_", " ")}.` : "Missing from saved evidence. Supply a sourced value or explicit user assumption."}</p>
+        {/* Provenance is always recorded; it opens by itself when something is missing. */}
+        <details open={!f.source || !f.as_of ? true : undefined}>
+          <summary className="cursor-pointer list-none text-[12px] text-black/45">Source: <span className="text-black/65">{draft[f.key]?.source?.trim() || "not set"}</span>{draft[f.key]?.as_of ? ` · ${draft[f.key].as_of}` : ""} <span className="text-[#007AFF]">Edit</span></summary>
+          <div className="mt-2 space-y-2">
+            <label className="mizan-label">Source for {f.label}<input className="mizan-input !text-xs" value={draft[f.key]?.source ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], source: e.target.value } }); setError(""); }} placeholder="Source / user assumption" /></label>
+            <label className="mizan-label">Source date for {f.label}<input className="mizan-input" type="date" value={draft[f.key]?.as_of ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], as_of: e.target.value } }); setError(""); }} /></label>
+            <p className="text-[10px] text-slate-500">{f.origin === "market_observation" ? "Filled from a matching source observation; source and date are recorded." : f.origin ? `Filled from ${f.origin.replaceAll("_", " ")}.` : "Missing from saved evidence. Supply a sourced value or explicit user assumption."}</p>
+          </div>
+        </details>
       </div>)}
     </div>
     <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="text-xs px-3 py-2 border rounded disabled:opacity-50" onClick={() => perform(false)}>Save inputs</button><button type="button" disabled={busy || !complete} className="mizan-button !text-xs" onClick={() => perform(true)}>{busy ? "Processing…" : "Calculate now"}</button><button type="button" className="text-xs text-blue-700" disabled={busy} onClick={refresh}>Refresh evidence</button></div>

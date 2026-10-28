@@ -1,5 +1,4 @@
 @import "leaflet/dist/leaflet.css";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,7 +6,7 @@
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, 'Helvetica Neue', Arial, 'Noto Sans Arabic', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -29,8 +28,10 @@
 @layer components {
   .mizan-panel { @apply bg-white border border-slate-200 rounded-lg p-5; }
   .mizan-label { @apply block text-xs font-medium text-slate-600 space-y-1; }
-  .mizan-input { @apply block w-full border border-slate-300 rounded px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500; }
-  .mizan-button { @apply px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed; }
+  .mizan-input { @apply block w-full rounded-lg border border-transparent bg-black/[0.05] px-3 py-2 text-sm text-slate-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#007AFF]; }
+  .mizan-button { @apply px-4 py-2 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] disabled:opacity-40 disabled:cursor-not-allowed; }
+  .mizan-field { @apply block w-full rounded-lg bg-black/[0.05] px-2.5 py-1.5 text-[14px] text-black/85 outline-none focus:bg-white focus:ring-2 focus:ring-[#007AFF]; }
+  .mizan-select { @apply max-w-[55%] appearance-none bg-transparent text-right text-[15px] text-black/45 outline-none focus:text-[#007AFF]; }
   .mizan-error { @apply p-3 bg-red-50 text-red-800 text-sm rounded border border-red-200 whitespace-pre-wrap break-words; }
   .mizan-table { @apply w-full text-sm text-left; }
   .mizan-table th { @apply text-xs text-slate-500 font-semibold py-2 px-3 border-b border-slate-200; }
@@ -44,20 +45,28 @@
 .mizan-overlay-root { position:absolute; left:0; top:0; }
 .mizan-overlay-root > * { position:absolute; transform:translate(-50%, -50%); }
 .mizan-leaflet-icon { background:none; border:none; }
-.mizan-marker, .mizan-subject { display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%;
-  border:2px solid #fff; color:#fff; font:600 11px/1 Inter, system-ui, sans-serif; box-shadow:0 1px 4px rgb(0 0 0 / .45); cursor:pointer; padding:0; }
-.mizan-marker--cluster { width:36px; height:36px; font-size:12px; }
+.mizan-marker, .mizan-subject { display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%;
+  border:2.5px solid #fff; color:#fff; font:600 11px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; box-shadow:0 2px 6px rgb(0 0 0 / .3); cursor:pointer; padding:0; transition:transform .12s ease; }
+.mizan-marker:hover { transform:scale(1.12); }
+.mizan-marker--cluster { width:34px; height:34px; font-size:12.5px; }
 .mizan-marker:focus-visible, .mizan-subject:focus-visible { outline:3px solid #fde047; outline-offset:2px; }
-.mizan-marker.is-selected { outline:3px solid #38bdf8; outline-offset:2px; z-index:5; }
-.mizan-marker.is-grouped { outline:2px dashed #38bdf8; outline-offset:2px; }
-.mizan-subject { width:36px; height:36px; background:#1e3a8a; border:3px solid #fde047; font-size:13px; z-index:10; touch-action:none; }
-.mizan-subject.is-confirmed { border-color:#fff; background:#1d4ed8; }
+.mizan-marker.is-selected { transform:scale(1.3); box-shadow:0 0 0 4px rgb(0 122 255 / .35), 0 2px 8px rgb(0 0 0 / .35); z-index:5; }
+.mizan-marker.is-grouped { box-shadow:0 0 0 3px rgb(0 122 255 / .3), 0 2px 6px rgb(0 0 0 / .3); }
+.mizan-subject { width:38px; height:38px; background:#FF3B30; border:3px solid #fff; font-size:14px; z-index:10; touch-action:none; box-shadow:0 4px 12px rgb(0 0 0 / .35); }
+.mizan-subject.is-confirmed { background:#FF3B30; }
+.mizan-subject:not(.is-confirmed) { animation: mizanPulse 1.6s ease-in-out infinite; }
+@keyframes mizanPulse { 0%,100% { box-shadow:0 0 0 0 rgb(255 59 48 / .45), 0 4px 12px rgb(0 0 0 / .35); } 50% { box-shadow:0 0 0 10px rgb(255 59 48 / 0), 0 4px 12px rgb(0 0 0 / .35); } }
+@media (prefers-reduced-motion: reduce) { .mizan-subject:not(.is-confirmed) { animation:none; } .mizan-marker { transition:none; } }
+.mizan-place { display:block; width:18px; height:18px; border-radius:50%; background:#007AFF; border:3px solid #fff; box-shadow:0 0 0 6px rgb(0 122 255 / .2), 0 2px 6px rgb(0 0 0 / .3); }
+.mizan-apple .leaflet-control-attribution { background:rgb(255 255 255 / .7); backdrop-filter:blur(8px); border-radius:8px 0 0 0; font-size:10px; color:rgb(0 0 0 / .55); }
+.mizan-apple .leaflet-control-scale { margin-bottom:4px !important; }
+.mizan-apple .leaflet-control-scale-line { background:rgb(255 255 255 / .7); border-color:rgb(0 0 0 / .5); font-size:10px; }
 .mizan-subject.is-draggable { cursor:grab; }
 .mizan-subject.is-dragging { cursor:grabbing; opacity:.85; }
-.mizan-vertex { display:block; width:10px; height:10px; border-radius:50%; background:#fff; border:2px solid #0284c7; pointer-events:none; }
+.mizan-vertex { display:block; width:12px; height:12px; border-radius:50%; background:#fff; border:2.5px solid #007AFF; box-shadow:0 1px 3px rgb(0 0 0 / .3); pointer-events:none; }
 .mizan-tool { @apply inline-flex items-center justify-center h-8 min-w-8 px-2 rounded text-xs font-medium text-slate-700 bg-white/95 border border-slate-300 shadow-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500; }
 .mizan-tool[aria-pressed="true"] { @apply bg-blue-700 text-white border-blue-700; }
 .mizan-chip { @apply inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600; }
 .mizan-tab { @apply px-3 py-2 text-xs font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-800; }
 .mizan-tab[aria-selected="true"] { @apply text-blue-700 border-blue-700; }
-.mizan-compact-input { @apply block w-full border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500; }
+.mizan-compact-input { @apply block w-full rounded-md border border-transparent bg-black/[0.05] px-2 py-1 text-xs focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#007AFF]; }

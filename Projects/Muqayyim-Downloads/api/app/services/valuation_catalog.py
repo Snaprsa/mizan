@@ -8,7 +8,7 @@ def field(key, label, unit, minimum=0, maximum=None, positive=False, property_pa
 
 METHODS = {
     'sales_comparison': {'label': 'Sales comparison', 'implemented': True,
-        'description': 'Unadjusted indication from at least three reviewed, dated, nearby achieved transactions of the same property type.',
+        'description': 'At least three reviewed, dated, nearby achieved sales of the same property type, with optional reviewed adjustments.',
         'fields': [field('area_sqm', 'Subject comparison area', 'sqm', positive=True)]},
     'income_capitalization': {'label': 'Income capitalization', 'implemented': True,
         'description': 'Build NOI from annual income, vacancy and expenses, then capitalize at the explicit selected rate.',

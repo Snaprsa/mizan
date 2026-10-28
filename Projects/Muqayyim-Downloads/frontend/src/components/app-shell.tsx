@@ -26,8 +26,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const fullBleed = path === "/map" || path.startsWith("/map/");
   const [collapsed, setCollapsed] = useState<boolean | null>(null);
   useEffect(() => { try { const v = localStorage.getItem(KEY); setCollapsed(v == null ? null : v === "1"); } catch { /* storage unavailable */ } }, []);
-  const isCollapsed = collapsed ?? fullBleed; // The map defaults to an icon rail to leave room for the canvas.
+  const isCollapsed = collapsed ?? false;
   const toggle = () => { const next = !isCollapsed; setCollapsed(next); try { localStorage.setItem(KEY, next ? "1" : "0"); } catch { /* ignore */ } };
+  if (fullBleed) return <div className="h-screen overflow-hidden"><ToastProvider>{children}</ToastProvider></div>;
   return <div className="flex h-screen overflow-hidden">
     <aside className={`${isCollapsed ? "w-14" : "w-56"} flex-shrink-0 bg-slate-900 flex flex-col select-none transition-[width] duration-100`} aria-label="Main navigation">
       <div className="h-12 px-3 flex items-center gap-2 border-b border-slate-700/60">
