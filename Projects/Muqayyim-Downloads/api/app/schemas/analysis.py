@@ -2,7 +2,7 @@
 from datetime import date
 from typing import Literal
 from pydantic import Field
-from api.app.schemas.foundation import StrictModel
+from api.app.schemas.foundation import StrictModel, AdjustmentSetup
 
 
 class StartAnalysis(StrictModel):
@@ -37,3 +37,9 @@ class SaveAnalysis(StrictModel):
 
 class RunAnalysis(StrictModel):
     expected_revision: int = Field(ge=1)
+
+
+class SaveAdjustments(StrictModel):
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=500)
+    adjustments: AdjustmentSetup

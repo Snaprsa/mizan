@@ -21,7 +21,7 @@ The active application is `Projects/Muqayyim-Downloads`. Keep this relative path
 | Assumptions | Explicit value/unit/category/source/date/status/override; stored history and immutable property input snapshots |
 | Market data | Provider-neutral source registry, append-only normalized observations, JSON/CSV import with duplicate/conflict checks; unverified local dataset inventory |
 | Comparable workflow | URL/PDF ingestion, Arabic normalization, extracted field citations, reviewed overrides, status changes, CSV/XLSX/PDF exports |
-| Valuation | Initial sales baseline, direct income cap, annual unlevered DCF, cost/DRC, static residual land; automatic sourced preparation/readiness; input/result histories |
+| Valuation | Sales comparison with a reviewed adjustment grid (28 Oct 2026): per-comparable adjustments for 16 factors in %, SAR/m² or SAR lump sum, each with rationale/source and proposed/approved status; sourced compound time rule; transactional adjustments compound in order, property adjustments additive; equal / inverse-gross / manual (rationale) weights; mean, median, weighted mean/median, IQR, CV; outlier and heavy-adjustment flags; reviewed exclusions; IQR low/base/high (not a confidence interval). Default grid reproduces the former unadjusted median. Also direct income cap, annual unlevered DCF, cost/DRC, static residual land; automatic sourced preparation/readiness; input/result histories |
 | Sensitivities | Two-way model sensitivities for income, annual DCF, cost and residual; invalid stresses remain unavailable |
 | HBU utility | Experimental sourced-gate / timed-cash-flow screening service with unit tests; not an integrated HBU workspace |
 | Reuse | Income/DCF/cost classes loaded from `Projects/Mizan-Antigravity/src/mizan_engine/approaches` through an adapter |
@@ -32,7 +32,7 @@ The active application is `Projects/Muqayyim-Downloads`. Keep this relative path
 
 Satellite imagery is implemented but unverified pending a Google key. There is no parcel/cadastral service, authorized planning lookup, complete GIS, calibrated AVM, connected public transaction feed, full debt/HBU/development workflow, institutional portfolio/reporting/collaboration or complete bilingual translation.
 
-The five connected methods are initial indications, not the complete original platform specification. Sales uses an unadjusted median from at least three distinct, active, dated, nearby achieved transactions of the same property type. DCF is annual and unlevered. Residual land is static. Legacy heuristic confidence/ranges are not exposed as calibrated confidence.
+The five connected methods are initial indications, not the complete original platform specification. Sales still requires at least three distinct, active, dated, nearby achieved transactions of the same property type (and three after exclusions); adjustments are reviewer judgements, not market-derived, unless their recorded source says so. Comparables carry few structured attributes (area, date, location, tenure), so attribute-driven automatic adjustment proposals are not implemented. Rental comparables are not implemented. DCF is annual and unlevered. Residual land is static. Legacy heuristic confidence/ranges are not exposed as calibrated confidence.
 
 The public checkout contains no private runtime records, raw Saudi indicator workbooks, training CSVs, model binaries or uploaded evidence. Fresh migrations create an empty database. The local dataset inventory can be empty; no fictional records are added to populate the map.
 

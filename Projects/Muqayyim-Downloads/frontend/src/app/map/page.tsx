@@ -71,16 +71,21 @@ function MapWorkspace() {
   useEffect(() => { setViewportMode(false); setGroup([]); }, [baseQuery]);
 
   // The analysis property supplies the subject, its coordinate provenance and any saved outline.
+  // True once this session has been on "no analysis": an outline drawn then belongs to the next analysis started.
+  const blankBefore = useRef(false);
   const [propertyRevision, setPropertyRevision] = useState<number | null>(null); const [geometrySaves, setGeometrySaves] = useState(0);
   useEffect(() => {
-    if (!analysisId) { setPrepared(null); setPropertyRevision(null); return; }
+    if (!analysisId) { setPrepared(null); setPropertyRevision(null); blankBefore.current = true; return; }
     let current = true;
     getProperty(analysisId).then(p => { if (!current) return; setPropertyRevision(p.revision);
       const loc = p.property.location as Record<string, unknown>;
       const outline = loc.site_outline as GeoJSONPolygon | undefined;
-      update(s => ({ siteOutline: outline?.coordinates ? latLngsFromPolygon(outline) : s.siteOutline,
+      // A saved outline wins; an unsaved one is kept only if it was drawn before any analysis was open.
+      const carried = blankBefore.current ? undefined : null;
+      update(s => ({ siteOutline: outline?.coordinates ? latLngsFromPolygon(outline) : carried === null ? null : s.siteOutline,
         subject: typeof loc.latitude === "number" && typeof loc.longitude === "number" ? { coordinates: [loc.latitude, loc.longitude],
           source: (loc.coordinate_source as Subject["source"]) || "map_pin", precision: (loc.coordinate_precision as Subject["precision"]) || "user_selected", confirmed: true, label: p.property.name } : s.subject }));
+      blankBefore.current = false;
     }).catch(e => setError(e.message));
     return () => { current = false; };
   }, [analysisId, update]);
@@ -311,7 +316,8 @@ function MapWorkspace() {
               {t}{t === "evidence" ? ` (${listed.length})` : t === "coverage" ? ` (${unlocated.length})` : ""}</button>)}
             {!narrow && <button type="button" className="ml-auto p-2 text-slate-400 hover:text-slate-700" aria-label="Collapse inspector" onClick={() => setPanels({ right: false })}><PanelRightClose size={15} /></button>}
           </div>
-          {selected && <SelectedRecord record={selected} subject={subjectPoint} onClear={() => update({ selectedId: null })} onUseAsSubject={openProperty} />}
+          {selected && <SelectedRecord record={selected} subject={subjectPoint} onClear={() => update({ selectedId: null })} onUseAsSubject={openProperty}
+            compact={ws.panels.tab === "valuation"} onExpand={() => setPanels({ tab: "evidence" })} />}
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div role="tabpanel" id="panel-evidence" aria-labelledby="tab-evidence" hidden={ws.panels.tab !== "evidence"}>
               <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2 text-xs border-b border-slate-100">

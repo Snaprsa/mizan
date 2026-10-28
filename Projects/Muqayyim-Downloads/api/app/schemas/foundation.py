@@ -125,11 +125,60 @@ class Provenance(StrictModel):
     notes: str | None = None
 
 
+AdjustmentFactor = Literal['conditions_of_sale', 'financing', 'market_conditions', 'location', 'size', 'frontage',
+                           'street_width', 'corner', 'shape', 'condition', 'age', 'quality', 'occupancy',
+                           'development_potential', 'zoning', 'other']
+
+
+class AdjustmentLine(StrictModel):
+    """One reviewer adjustment to one comparable, in SAR per m² of the comparable unless stated."""
+    comparable_id: str = Field(min_length=1, max_length=120)
+    factor: AdjustmentFactor
+    basis: Literal['percent', 'sar_per_sqm', 'sar_total']
+    amount: float
+    rationale: str = Field(min_length=3, max_length=1000)
+    source: str | None = Field(None, max_length=500)
+    status: Literal['proposed', 'approved'] = 'proposed'
+
+    @model_validator(mode='after')
+    def bounded(self):
+        if self.basis == 'percent' and not -0.9 <= self.amount <= 2:
+            raise ValueError('Percentage adjustments must be between -90% and +200% (enter 0.10 for 10%)')
+        return self
+
+
+class TimeAdjustment(StrictModel):
+    """Market-conditions rule: compound annual change applied from each sale date to the valuation date."""
+    annual_rate: float = Field(ge=-0.5, le=0.5)
+    source: str = Field(min_length=3, max_length=500)
+    as_of: date
+    status: Literal['proposed', 'approved'] = 'proposed'
+
+
+class AdjustmentSetup(StrictModel):
+    lines: list[AdjustmentLine] = Field(default_factory=list, max_length=500)
+    time: TimeAdjustment | None = None
+    weighting: Literal['equal', 'inverse_gross_adjustment', 'manual'] = 'equal'
+    manual_weights: dict[str, float] = Field(default_factory=dict)
+    weighting_rationale: str | None = Field(None, max_length=1000)
+    conclusion_basis: Literal['median', 'mean', 'weighted_mean', 'weighted_median'] = 'median'
+    exclusions: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if any(w < 0 for w in self.manual_weights.values()):
+            raise ValueError('Comparable weights cannot be negative')
+        if any(len(reason.strip()) < 3 for reason in self.exclusions.values()):
+            raise ValueError('Every excluded comparable needs a reason')
+        return self
+
+
 class ValuationSetup(StrictModel):
     method: str | None = None
     radius_km: float = Field(3, ge=0.1, le=50)
     lookback_days: int = Field(365, ge=1, le=3650)
     as_of: date | None = None
+    adjustments: AdjustmentSetup = Field(default_factory=AdjustmentSetup)
 
 
 class PropertyInput(StrictModel):

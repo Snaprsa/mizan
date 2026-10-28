@@ -16,8 +16,13 @@ const isFuture = (d: string | null) => !!d && d > riyadhToday();
 const safeUrl = (s: string) => /^https?:\/\//i.test(s) ? s : null;
 const priceLabel = (r: MapRecord) => r.kind === "transaction" ? "Achieved price" : r.kind === "listing" || r.kind === "property" ? "Asking price" : "Price";
 
-export function SelectedRecord({ record, subject, onClear, onUseAsSubject }: { record: MapRecord; subject: LatLng | null; onClear: () => void; onUseAsSubject: (r: MapRecord) => void }) {
+export function SelectedRecord({ record, subject, onClear, onUseAsSubject, compact = false, onExpand }: { record: MapRecord; subject: LatLng | null; onClear: () => void; onUseAsSubject: (r: MapRecord) => void; compact?: boolean; onExpand?: () => void }) {
   const layer = LAYER[record.kind];
+  if (compact) return <div className="flex items-center gap-2 border-b border-slate-200 bg-blue-50/40 px-4 py-1.5 text-xs" aria-label="Selected record">
+    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: layer.color }} /><span className="font-medium truncate" dir="auto">{record.title}</span>
+    <span className="text-slate-500 whitespace-nowrap">{record.price_per_sqm == null ? money(record.price, record.currency) : `${n0.format(record.price_per_sqm)} /m²`}</span>
+    {onExpand && <button type="button" className="ml-auto text-blue-700 underline whitespace-nowrap" onClick={onExpand}>Details</button>}
+    <button type="button" className="text-slate-400 hover:text-slate-700 px-1" aria-label="Clear selected record" onClick={onClear}>×</button></div>;
   return <section className="border-b border-slate-200 bg-blue-50/40 px-4 py-3" aria-label="Selected record">
     <div className="flex items-start gap-2"><span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: layer.color }} />
       <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold break-words" dir="auto">{record.title}</h3>

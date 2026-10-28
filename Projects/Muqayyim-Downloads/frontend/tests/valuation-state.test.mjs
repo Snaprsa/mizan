@@ -36,3 +36,13 @@ test('normalized draft and prepared signatures agree', () => {
   const p=prepared();assert.equal(preparedSignature(p),valuationSignature({method:p.method,asOf:p.as_of,
     radius:3,lookback:365,inputs:{area_sqm:{value:500,source:' Survey ',as_of:'2026-10-20',status:'observed'}}, evidence:p.eligible_comparables}));
 });
+
+test('changed reviewed adjustments make a saved sales result stale', () => {
+  const grid = { lines: [{ comparable_id: 'one', factor: 'location', basis: 'percent', amount: 0.1, rationale: 'access', status: 'approved' }],
+    time: null, weighting: 'equal', manual_weights: {}, weighting_rationale: null, conclusion_basis: 'median', exclusions: {} };
+  const p = { ...prepared(), adjustment_setup: grid };
+  assert.equal(savedRunMatchesPrepared(p, { ...run(), adjustment_setup: grid }), true);
+  const changed = { ...grid, lines: [{ ...grid.lines[0], amount: 0.2 }] };
+  assert.equal(savedRunMatchesPrepared(p, { ...run(), adjustment_setup: changed }), false);
+  assert.equal(savedRunMatchesPrepared(p, run()), false, 'a run saved before adjustments is not current');
+});

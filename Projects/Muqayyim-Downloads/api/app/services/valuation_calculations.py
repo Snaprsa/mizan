@@ -1,24 +1,35 @@
 """Financial calculations separated from API/UI; no market rates or prices are invented."""
 from decimal import Decimal
-from statistics import median
 import math
 from api.app.services.legacy_valuation import engines
+from api.app.services.comparable_adjustments import analyse
 
-VERSION = 'mizan.map-workflow.2'
+VERSION = 'mizan.map-workflow.3'  # .3: reviewed comparable adjustment grid for sales comparison
 
 
-def calculate(method, v, eligible, *, include_sensitivity=True):
+def calculate(method, v, eligible, *, include_sensitivity=True, adjustments=None, as_of=None):
     Income, Cost, legacy_hash = engines()
     result = {'method': method, 'currency': 'SAR', 'confidence': None, 'calculation_version': VERSION,
               'legacy_engine_hash': legacy_hash, 'limitations': []}
     if method == 'sales_comparison':
-        rates = [r['price_per_sqm'] for r in eligible]
-        rate = median(rates)
+        grid = analyse(eligible, adjustments, v['area_sqm'], str(as_of) if as_of else None)
+        if grid['gaps']:
+            raise ValueError('; '.join(grid['gaps']))
+        rate = grid['concluded_sar_sqm']
+        rates = [r['raw_sar_sqm'] for r in grid['rows']]
+        applied = sum(len(r['steps']) for r in grid['rows'])
         result.update(value=rate*v['area_sqm'], price_per_sqm=rate,
-            evidence={'median_sar_sqm': rate, 'comparable_count': len(rates), 'area_sqm': v['area_sqm'],
-                      'observed_unit_price_min': min(rates), 'observed_unit_price_max': max(rates)},
-            limitations=['Unadjusted comparable indication; differences in area basis, condition, time and location still need professional review.',
-                         'The observed price distribution is not a confidence interval.'])
+            evidence={'concluded_sar_sqm': rate, 'conclusion_basis': grid['conclusion_basis'], 'weighting': grid['weighting'],
+                      'comparable_count': len(grid['rows']), 'excluded_count': len(grid['excluded']), 'area_sqm': v['area_sqm'],
+                      'observed_unit_price_min': min(rates), 'observed_unit_price_max': max(rates),
+                      'raw_statistics': grid['raw'], 'adjusted_statistics': grid['adjusted'], 'indication': grid['indication'],
+                      'applied_adjustments': applied, 'pending_adjustments': grid['pending_count'],
+                      'grid': grid['rows'], 'excluded': grid['excluded'], 'conventions': grid['conventions'],
+                      **({'median_sar_sqm': rate} if grid['conclusion_basis'] == 'median' and not applied else {})},
+            limitations=(['Unadjusted comparable indication; differences in area basis, condition, time and location still need professional review.']
+                         if not applied else ['Adjustments are reviewer judgements recorded with rationales; they are not market-derived unless their source says so.'])
+                        + ['The interquartile range of adjusted unit values is not a confidence interval.']
+                        + ([f"{grid['pending_count']} proposed adjustment(s) were not approved and were not applied."] if grid['pending_count'] else []))
     elif method == 'income_capitalization':
         effective = v['annual_rent']*(1-v['vacancy'])+v['other_income']
         noi = effective-v['operating_expenses']

@@ -56,7 +56,7 @@ npm --prefix Projects/Muqayyim-Downloads/frontend run test
 npm --prefix Projects/Muqayyim-Downloads/frontend run build
 ```
 
-Last verified local baseline (map upgrade, 28 October 2026): 97 backend tests, 15 frontend tests and a production build. GitHub CI has not run on these uncommitted changes. Recheck after source changes; this is a baseline, not a permanent required test count. Browser checks use disposable APIs and clearly synthetic fixtures; mocked tiles do not verify live imagery.
+Last verified local baseline (comparable adjustment grid, 28 October 2026): 104 backend tests, 16 frontend tests and a production build. Recheck after source changes; this is a baseline, not a permanent required test count. Browser checks use disposable APIs and clearly synthetic fixtures; mocked tiles do not verify live imagery.
 
 ## Execution and handoff
 

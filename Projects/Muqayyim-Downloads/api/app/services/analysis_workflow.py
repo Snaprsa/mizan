@@ -9,6 +9,7 @@ from api.app.services.foundation import assumptions, owner_id
 from api.app.services.valuation_catalog import METHODS
 from api.app.routers.map import map_records
 from api.app.services.valuation_calculations import VERSION
+from api.app.services.comparable_adjustments import analyse
 
 
 def saudi_today():
@@ -143,6 +144,14 @@ async def prepare(db, p, user, method=None):
     values = {f['key']: f['value'] for f in fields if f['value'] is not None}
     if key == 'sales_comparison' and len(eligible) < 3:
         gaps.append(f'Need at least 3 distinct, active, dated, nearby achieved transactions; found {len(eligible)}')
+    adjustment_setup = (setup.get('adjustments') or None) if key == 'sales_comparison' else None
+    adjustment_analysis = None
+    if key == 'sales_comparison' and len(eligible) >= 3:
+        try:
+            adjustment_analysis = analyse(eligible, adjustment_setup, values.get('area_sqm'), as_of)
+            gaps.extend(adjustment_analysis['gaps'])
+        except ValueError as exc:
+            gaps.append(f'Comparable adjustments: {exc}')
     if key == 'sales_comparison' and evidence['truncated']:
         gaps.append('Evidence exceeds the map record limit; the evidence query must be narrowed before automated selection')
     if key == 'cost' and sum(values.get(k, 0) for k in ['physical_depreciation','functional_obsolescence','economic_obsolescence']) > 1:
@@ -157,5 +166,6 @@ async def prepare(db, p, user, method=None):
         'as_of': as_of, 'radius_km': radius, 'lookback_days': lookback, 'fields': fields,
         'candidates': candidates, 'eligible_comparables': eligible, 'gaps': gaps, 'ready': not gaps,
         'coverage': evidence.get('coverage'),
+        'adjustment_setup': adjustment_setup, 'adjustment_analysis': adjustment_analysis,
         'calculation_version': VERSION,
         'calculation_status': 'ready' if not gaps else 'needs_inputs'}

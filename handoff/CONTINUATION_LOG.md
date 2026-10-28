@@ -1,5 +1,26 @@
 # Continuation log
 
+## 2026-10-28 — Increment B (part 1): professional comparable adjustment grid
+
+### Completed behaviour
+- `api/app/services/comparable_adjustments.py` (pure): per-comparable adjustment trail in SAR/m² of the comparable; transactional factors (conditions of sale → financing → market conditions) compound in order; a sourced annual time rule is compounded from each sale date to the valuation date; property factors are additive on the transaction-adjusted value; SAR lump sums ÷ comparable area (rejected without area). Only `approved` lines apply. Gross/net adjustment, heavy-adjustment (>25%) and Tukey-fence outlier flags (informational only). Exclusions require reasons and ≥3 comparables must remain. Weights: equal, inverse gross (1/(5%+gross)), manual (needs every weight + rationale). Raw vs adjusted mean/median/weighted mean/weighted median/IQR/std/CV; conclusion basis selectable; low/base/high = IQR × subject area, labelled not a confidence interval.
+- Stored as `property.analysis.adjustments` (validated `AdjustmentSetup`), saved via `PUT /api/v1/analysis/{id}/adjustments` with expected revision + reason → new revision, snapshot, audit log. `save_inputs` now preserves other analysis settings (previously it would have dropped them).
+- `prepare` returns `adjustment_setup` and a server-computed `adjustment_analysis` preview; runs snapshot `adjustment_setup` and the full grid in outputs. Calculation version → `mizan.map-workflow.3` (older runs show as previous versions).
+- Frontend `AdjustmentGrid` in the Valuation tab: concluded value/indication, stats table, time rule, weighting/basis, per-comparable cards (trail, add/edit/approve/remove lines, manual weight, exclude/include), unsaved-change protection, reason for revision. No formulas in React; preview reflects the saved grid. Freshness signature includes the grid.
+- Fixes: site outline no longer leaks from one analysis to another; selected-record card collapses to a one-line strip in the Valuation tab.
+
+### Tests (28 Oct 2026)
+- Backend 104 passed (+7 adjustment tests: default = unadjusted median, compounding order and arithmetic, approval gating, weighting/weighted median, exclusions/outliers, lump-sum/heavy flags, API persistence/stale-revision 409/inputs-save preservation/run snapshot/revision history).
+- Frontend 16 passed (+ stale-on-adjustment-change). Lint, type-check, production build pass.
+- Browser (synthetic fixtures, disposable API :8100, dev :3101 `.next-dev`): add/approve location +10%, approved 5%/yr time rule, inverse weights → conclusion 3,343 → 3,459 SAR/m²; auto-calculated run equals preview; exclusion → n=15; manual weighting without weights/rationale blocks conclusion; state survives reload. Screenshot `05-synthetic-adjustment-grid.jpg` (local).
+- Runtime :3100/:8000 rebuilt/restarted; runtime property prepares unchanged (no grid: <3 eligible sales).
+
+### Remaining / next
+- Structured comparable attributes (street width, frontage, corner, age, condition, zoning) are not captured, so no automatic adjustment proposals or paired-sales derivation yet.
+- Rental comparables / comparable-rent method, multi-method reconciliation with applicability/evidence-quality weights, and the HBU/development increment remain.
+- Next: add structured comparable attributes to evidence review + subject-vs-comparable attribute grid, then reconciliation across methods.
+
+
 ## 2026-10-28 — Increment A/B/C: map-first workspace and imagery provider
 
 ### Current task

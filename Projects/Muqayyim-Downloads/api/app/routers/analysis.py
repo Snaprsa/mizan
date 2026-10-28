@@ -10,7 +10,7 @@ from api.app.audit import log_action
 from api.app.models import Case, ValuationRun
 from api.app.models.foundation import Property, PropertyAssumption
 from api.app.schemas.foundation import PropertyInput
-from api.app.schemas.analysis import StartAnalysis, SaveAnalysis, RunAnalysis
+from api.app.schemas.analysis import StartAnalysis, SaveAnalysis, RunAnalysis, SaveAdjustments
 from api.app.services.foundation import (owner_id, can_write, owned_property, search_columns,
     save_snapshot, advance_revision, assumptions)
 from api.app.services.valuation_catalog import catalog, PROPERTY_TYPES
@@ -67,7 +67,8 @@ async def save_inputs(property_id: uuid.UUID, body: SaveAnalysis,
         if item.as_of > body.as_of:
             raise HTTPException(422, 'Input source dates cannot be after the valuation date')
     p = await owned_property(db, property_id, user)
-    data = {**p.data, 'analysis': {'method': body.method, 'as_of': body.as_of.isoformat(),
+    # Keep other analysis settings (e.g. reviewed comparable adjustments) when saving method inputs.
+    data = {**p.data, 'analysis': {**(p.data.get('analysis') or {}), 'method': body.method, 'as_of': body.as_of.isoformat(),
              'radius_km': body.radius_km, 'lookback_days': body.lookback_days}}
     changes = {'data': data}
     if p.case_id is None:
@@ -95,6 +96,21 @@ async def save_inputs(property_id: uuid.UUID, body: SaveAnalysis,
     return await prepare(db, p, user)
 
 
+@router.put('/{property_id}/adjustments')
+async def save_adjustments(property_id: uuid.UUID, body: SaveAdjustments,
+        db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    """Persist the reviewed sales-comparison adjustment grid as a new property revision."""
+    can_write(user)
+    p = await owned_property(db, property_id, user)
+    setup = body.adjustments.model_dump(mode='json')
+    data = {**p.data, 'analysis': {**(p.data.get('analysis') or {}), 'adjustments': setup}}
+    await advance_revision(db, p, body.expected_revision, {'data': data})
+    await save_snapshot(db, p, 'Comparable adjustments: '+body.reason, user)
+    await log_action(db, 'property', p.id, 'comparable_adjustments_saved', user['id'],
+                     {'revision': p.revision, 'lines': len(setup['lines']), 'excluded': len(setup['exclusions'])})
+    return await prepare(db, p, user)
+
+
 @router.post('/{property_id}/runs', status_code=201)
 async def run(property_id: uuid.UUID, body: RunAnalysis,
         db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
@@ -111,12 +127,14 @@ async def run(property_id: uuid.UUID, body: RunAnalysis,
         raise HTTPException(409, 'Save and review the prepared inputs before calculating')
     values = {f['key']: f['value'] for f in prepared['fields']}
     try:
-        outputs = calculate(prepared['method'], values, prepared['eligible_comparables'])
+        outputs = calculate(prepared['method'], values, prepared['eligible_comparables'],
+                            adjustments=prepared.get('adjustment_setup'), as_of=prepared['as_of'])
     except (ValueError, OverflowError) as exc:
         raise HTTPException(422, str(exc)) from exc
     snapshot = {'schema_version': 'mizan.valuation-run.v1', 'property_id': str(p.id), 'property_revision': p.revision,
         'property': p.data, 'assumptions': stored, 'method': prepared['method'], 'data_date': prepared['as_of'],
         'inputs': prepared['fields'], 'comparables': prepared['eligible_comparables'],
+        'adjustment_setup': prepared.get('adjustment_setup'),
         'calculation_version': outputs['calculation_version'], 'model_version': None, 'outputs': outputs}
     result = ValuationRun(case_id=p.case_id, subject_id=p.id, status='completed', data=snapshot)
     if p.case_id is None:

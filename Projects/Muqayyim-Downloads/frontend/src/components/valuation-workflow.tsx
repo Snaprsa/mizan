@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PreparedAnalysis, ValuationMethod, AnalysisInput, AnalysisResult, prepareAnalysis, saveAnalysisInputs, calculateAnalysis, getAnalysisRuns } from "@/lib/api";
 
 import SensitivityTable from "./sensitivity-table";
+import AdjustmentGrid from "./adjustment-grid";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
@@ -36,7 +37,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
   const values = useMemo(() => Object.fromEntries(Object.entries(draft).filter(([, d]) => d.value !== "").map(([key, d]) => [key, { value: Number(d.value), source: d.source, as_of: d.as_of,
       status: prepared?.fields.find(f => f.key === key && f.value === Number(d.value) && f.source === d.source && f.as_of === d.as_of)?.assumption_status || "user_input" }])) as Record<string, AnalysisInput>, [draft, prepared]);
   const signature = useMemo(() => valuationSignature({ method, asOf, radius: Number(radius),
-    lookback: Number(lookback), inputs: values, evidence: prepared?.eligible_comparables || [] }),
+    lookback: Number(lookback), inputs: values, evidence: prepared?.eligible_comparables || [], adjustments: prepared?.adjustment_setup }),
     [method, asOf, radius, lookback, values, prepared]);
   const complete = !!prepared && prepared.fields.every(f => {
     const d = draft[f.key]; const value = Number(d?.value);
@@ -44,14 +45,15 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
       (!f.positive || value > 0) && (f.maximum == null || value <= f.maximum) && (f.key !== "holding_years" || Number.isInteger(value));
   }) && !!asOf && Number(radius) >= 0.1 && Number(radius) <= 50 && Number(lookback) >= 1 && Number(lookback) <= 3650;
   // Re-prepare from the server; fills untouched blanks and keeps the user's unsaved edits.
-  const refresh = useCallback(() => prepareAnalysis(propertyId, method || undefined).then(p => {
+  const adopt = useCallback((p: PreparedAnalysis) => {
     setPrepared(p); setDraft(previous => Object.fromEntries(p.fields.map(f => {
       const existing = previous[f.key];
       return [f.key, !existing || (existing.value === "" && existing.source === "" && existing.as_of === "")
         ? { value: f.value == null ? "" : String(f.value), source: f.source || "", as_of: f.as_of || "" }
         : existing];
     }))); onPrepared(p); setError("");
-  }).catch(e => setError(e.message)), [propertyId, method, onPrepared]);
+  }, [onPrepared]);
+  const refresh = useCallback(() => prepareAnalysis(propertyId, method || undefined).then(adopt).catch(e => setError(e.message)), [propertyId, method, adopt]);
   const lastRefreshKey = useRef(refreshKey);
   useEffect(() => { if (refreshKey !== lastRefreshKey.current) { lastRefreshKey.current = refreshKey; refresh(); } }, [refreshKey, refresh]);
   const perform = useCallback(async (shouldCalculate: boolean) => {
@@ -112,7 +114,8 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
     <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="text-xs px-3 py-2 border rounded disabled:opacity-50" onClick={() => perform(false)}>Save inputs</button><button type="button" disabled={busy || !complete} className="mizan-button !text-xs" onClick={() => perform(true)}>{busy ? "Processing…" : "Calculate now"}</button><button type="button" className="text-xs text-blue-700" disabled={busy} onClick={refresh}>Refresh evidence</button></div>
     {notice && <p role="status" className="text-xs text-green-800">{notice}</p>}
     {!!prepared.gaps.length && <details open className="bg-amber-50 p-3 rounded text-xs text-amber-900"><summary className="font-medium cursor-pointer">Still required / last saved readiness</summary><ul className="list-disc pl-4 mt-2 space-y-1">{prepared.gaps.map(g => <li key={g}>{g}</li>)}</ul></details>}
-    <details className="text-xs" open={method === "sales_comparison"}><summary className="font-medium cursor-pointer">Nearby evidence: {prepared.candidates.length} records · {prepared.eligible_comparables.length} eligible achieved sales</summary><p className="text-slate-500 mt-2">Within {prepared.radius_km} km. Listings and draft / undated / repeated evidence are not used as achieved sales.</p><div className="max-h-48 overflow-auto mt-2 space-y-2">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block text-left border rounded p-2 w-full" onClick={() => onSelectEvidence(c.id)}><span className="font-medium">{c.title}</span><span className="block text-slate-500">{c.distance_km} km · {c.eligible ? "Eligible achieved sale" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="text-slate-500">No located comparable evidence in this radius.</p>}</div></details>
+    {method === "sales_comparison" && prepared.adjustment_analysis && <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} />}
+    <details className="text-xs" open={method === "sales_comparison" && !prepared.adjustment_analysis}><summary className="font-medium cursor-pointer">Nearby evidence: {prepared.candidates.length} records · {prepared.eligible_comparables.length} eligible achieved sales</summary><p className="text-slate-500 mt-2">Within {prepared.radius_km} km. Listings and draft / undated / repeated evidence are not used as achieved sales.</p><div className="max-h-48 overflow-auto mt-2 space-y-2">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block text-left border rounded p-2 w-full" onClick={() => onSelectEvidence(c.id)}><span className="font-medium">{c.title}</span><span className="block text-slate-500">{c.distance_km} km · {c.eligible ? "Eligible achieved sale" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="text-slate-500">No located comparable evidence in this radius.</p>}</div></details>
     {result && <div className="border-t border-slate-200 pt-3"><p className="text-xs text-slate-500">{resultCurrent ? "Current saved indication" : "Previous saved result · inputs may have changed"}</p><p className="text-xl font-semibold mt-1">SAR {new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(result.outputs.value)}</p><p className="text-[10px] text-slate-500">{result.method} · property revision {result.property_revision} · {result.data_date}</p>{result.outputs.limitations.map(l => <p key={l} className="text-[11px] text-slate-500 mt-1">{l}</p>)}<SensitivityTable sensitivity={result.outputs.sensitivity} /><details className="mt-2 text-xs"><summary>Calculation details</summary><pre className="overflow-auto max-h-52 bg-slate-50 p-2 mt-2">{JSON.stringify(result.outputs.evidence, null, 2)}</pre></details></div>}
     {!!runs.length && <details className="text-xs"><summary className="cursor-pointer">Saved calculations ({runs.length})</summary><ul className="space-y-2 mt-2">{runs.map(r => <li key={r.id}><button className="text-blue-700" onClick={() => setResult({ ...r.data, id: r.id, created_at: r.created_at })}>{r.data.method} · revision {r.data.property_revision} · {new Date(r.created_at).toLocaleString()}</button></li>)}</ul></details>}
     <div className="flex gap-3 text-xs"><Link href={`/properties/${propertyId}`} className="text-blue-700 underline">Full property workspace</Link></div>
