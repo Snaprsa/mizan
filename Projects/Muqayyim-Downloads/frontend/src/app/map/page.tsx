@@ -12,7 +12,6 @@ import ValuationWorkflow from "@/components/valuation-workflow";
 import { areaPoints, formatArea, formatDistance, geodesicAreaSqm, haversineMeters, inSearchArea, latLngsFromPolygon, pathLengthMeters, polygonFromLatLngs, type GeoJSONPolygon, type LatLng, type SearchArea } from "@/lib/geo";
 import { applyEvidenceFilters, evidenceSummaries, facetValues, LAYER, LAYERS, riyadhToday, sourceLabel, UNAVAILABLE_LAYERS } from "@/lib/map-evidence";
 import { BASEMAPS, defaultState, loadState, saveState, type Basemap, type Camera, type Subject, type WorkspaceState } from "@/lib/map-workspace-state";
-import { readProviderConfig } from "@/lib/map-provider";
 import MapSearch from "@/components/map/map-search";
 import MapStylePanel from "@/components/map/map-style-panel";
 import { CoveragePanel, EvidenceTable, money, precisionLabel } from "@/components/map/evidence-panels";
@@ -54,8 +53,7 @@ function MapWorkspace() {
   const [sheet, setSheet] = useState<Sheet>("half"); const [place, setPlace] = useState<LatLng | null>(null); const [listSize, setListSize] = useState(30);
   const handle = useRef<RendererHandle | null>(null); const root = useRef<HTMLDivElement>(null);
   const today = useMemo(riyadhToday, []);
-  const [esriKey, setEsriKey] = useState<string | null>(null);
-  useEffect(() => { setEsriKey(readProviderConfig().esriKey); }, []);
+  const [imageryVersion, setImageryVersion] = useState(0); // Remounts the map after the key changes.
 
   useEffect(() => { getValuationCatalog().then(c => { setMethods(c.methods); setPropertyTypes(c.property_types); }).catch(e => setError(e.message)); }, []);
   useEffect(() => { const set = () => setNarrow(window.innerWidth < 768); set(); window.addEventListener("resize", set); return () => window.removeEventListener("resize", set); }, []);
@@ -338,7 +336,7 @@ function MapWorkspace() {
   const sheetHeight = narrow ? (sheet === "peek" ? "h-[200px]" : sheet === "half" ? "h-[52vh]" : "h-[88vh]") : "";
 
   return <div ref={root} className="mizan-apple relative h-full w-full overflow-hidden bg-[#e8e6e1]">
-    {hydrated && <MapRenderer key={esriKey || "standard"} handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} basemap={ws.basemap} initialCamera={ws.camera}
+    {hydrated && <MapRenderer key={imageryVersion} handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} basemap={ws.basemap} initialCamera={ws.camera}
       subject={ws.subject} subjectDraggable={!analysisId && !!ws.subject && !ws.subject.confirmed} searchArea={evidenceRing} editArea={editArea && !!ws.searchArea}
       siteOutline={ws.siteOutline} placeMarker={place} tool={tool} draft={draft ?? (measure ? { tool: "measure", points: measure } : null)}
       onCamera={onCamera} onSelect={select} onGroup={setGroup} onMapClick={onMapClick} onSubjectMove={onSubjectMove} onAreaEdit={onAreaEdit} onStatus={onStatus} />}
@@ -353,7 +351,7 @@ function MapWorkspace() {
             <p className="px-3 py-1.5 text-[13px] font-semibold text-black/80">Mizan <span lang="ar" className="font-normal text-black/40">ميزان</span></p>
             {NAV.map(n => <Link key={n.href} href={n.href} className="block rounded-lg px-3 py-2 text-[15px] text-black/80 hover:bg-black/[0.05]">{n.label}</Link>)}</Glass>}
         </div>
-        <div className="flex-1 min-w-0"><MapSearch records={all} geocodingAvailable={!!caps?.geocoding} hasKey={!!esriKey} onCoordinates={onCoordinates} onRecord={r => { setPlace(null); selectRecord(r); }} onPlace={onPlace} /></div>
+        <div className="flex-1 min-w-0"><MapSearch records={all} geocodingAvailable={!!caps?.geocoding} hasKey={!!status?.configured} onCoordinates={onCoordinates} onRecord={r => { setPlace(null); selectRecord(r); }} onPlace={onPlace} /></div>
       </div>
       {caseId && <p className="mx-4 mt-2 rounded-lg bg-[#007AFF]/10 px-3 py-1.5 text-[12.5px] text-[#0059c9]">Showing one case. <Link href="/map" className="underline">Show everything</Link></p>}
       {error && <p role="alert" className="mx-4 mt-2 rounded-lg bg-[#FF3B30]/10 px-3 py-1.5 text-[13px] text-[#c4271d]">{error}</p>}
@@ -364,8 +362,8 @@ function MapWorkspace() {
     <div className="absolute right-3 top-3 z-[1001] flex flex-col items-end gap-2">
       <Glass className="rounded-full"><button type="button" aria-label="Map style" aria-expanded={popover === "style"} onClick={() => setPopover(p => p === "style" ? "" : "style")} className="grid h-11 w-11 place-items-center text-black/75"><MapIcon size={19} /></button></Glass>
       {popover === "style" && <Glass className="max-h-[calc(100vh-90px)] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl p-3.5">
-        <MapStylePanel basemap={ws.basemap} status={status} onChoose={b => { update({ basemap: b }); setPopover(""); }}
-          onKeyChange={k => { setEsriKey(k); if (k) { update({ basemap: "hybrid" }); setPopover(""); setNotice("Satellite is on."); } }} /></Glass>}
+        <MapStylePanel basemap={status?.activeBasemap || ws.basemap} status={status} onChoose={b => { update({ basemap: b }); setPopover(""); }}
+          onKeyChange={on => { setImageryVersion(v => v + 1); if (on) { update({ basemap: "satellite" }); setPopover(""); setNotice("Satellite is on."); } }} /></Glass>}
       {status?.state === "error" && <Glass className="max-w-[260px] rounded-2xl px-3 py-2 text-[12.5px] text-[#c4271d]">{status.message}</Glass>}
     </div>
 

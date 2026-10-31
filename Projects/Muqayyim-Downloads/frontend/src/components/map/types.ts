@@ -1,14 +1,15 @@
 import type { MapRecord } from "@/lib/api";
 import type { LatLng, SearchArea } from "@/lib/geo";
 import type { Basemap, Camera, Subject } from "@/lib/map-workspace-state";
+import type { Capabilities } from "@/lib/map-provider";
 
 export type MapBounds = { south: number; west: number; north: number; east: number };
 export type MapTool = "browse" | "place_subject" | "draw_area" | "draw_site" | "measure";
 export type Draft = { tool: "draw_area" | "draw_site" | "measure"; points: LatLng[] } | null;
 
-export type Capabilities = Record<Basemap | "geocoding", boolean>;
+export type { Capabilities };
 export type MapStatus = {
-  provider: "esri" | "osm"; state: "loading" | "ready" | "error";
+  provider: "esri" | "osm"; state: "loading" | "ready" | "error"; configured: boolean; activeBasemap: Basemap; esri_streets: boolean;
   message?: string; capabilities: Capabilities;
   /** Attribution/notes as reported by the provider; never invented (no imagery dates are exposed). */
   imageryNote: string;

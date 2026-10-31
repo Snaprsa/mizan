@@ -6,7 +6,7 @@ import { MapPin, Search, X } from "lucide-react";
 import type { MapRecord } from "@/lib/api";
 import { parseCoordinates, type LatLng } from "@/lib/geo";
 import { LAYER } from "@/lib/map-evidence";
-import { esriGeocode, readProviderConfig, type PlaceResult } from "@/lib/map-provider";
+import { geocodePlaces, type PlaceResult } from "@/lib/map-provider";
 
 type Props = { records: MapRecord[]; geocodingAvailable: boolean; hasKey: boolean;
   onCoordinates: (p: LatLng) => void; onRecord: (r: MapRecord) => void; onPlace: (p: LatLng) => void };
@@ -26,10 +26,9 @@ export default function MapSearch({ records, geocodingAvailable, hasKey, onCoord
   useEffect(() => {
     setPlaces(null); setError("");
     if (!geocodingAvailable || coords || term.length < 3) return;
-    const key = readProviderConfig().esriKey; if (!key) return;
     const controller = new AbortController();
     const t = setTimeout(() => { setBusy(true);
-      esriGeocode(q.trim(), key, controller.signal).then(setPlaces).catch(e => { if ((e as Error).name !== "AbortError") setError((e as Error).message); })
+      geocodePlaces(q.trim(), controller.signal).then(setPlaces).catch(e => { if ((e as Error).name !== "AbortError") setError((e as Error).message); })
         .finally(() => setBusy(false)); }, 400);
     return () => { clearTimeout(t); controller.abort(); };
   }, [q, term.length, geocodingAvailable]); // eslint-disable-line react-hooks/exhaustive-deps

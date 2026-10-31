@@ -106,34 +106,19 @@ test('persisted workspace state is validated and survives round trips', () => {
   assert.deepEqual(sanitizeState({ version: 2 }), defaultState());
 });
 
-test('Esri provider: tile URL shape and geocode x/y become [latitude, longitude]', async () => {
-  const { esriTileUrl, esriGeocode, ESRI_STYLES } = await import('../src/lib/map-provider.ts');
-  assert.equal(esriTileUrl('arcgis/imagery', 'k&y'),
-    'https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/imagery/static/tile/{z}/{y}/{x}?token=k%26y');
-  assert.equal(ESRI_STYLES.hybrid.overlay, 'arcgis/imagery/labels');
+test('imagery goes through Mizan\'s API: tile URLs hold no key and places are [latitude, longitude]', async () => {
+  const { imageryTileUrl, geocodePlaces, saveImageryKey, BASEMAP_LAYERS } = await import('../src/lib/map-provider.ts');
+  assert.equal(imageryTileUrl('imagery'), '/api/v1/imagery/tiles/imagery/{z}/{y}/{x}');
+  assert.equal(BASEMAP_LAYERS.hybrid.overlay, 'labels');
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async url => ({ json: async () => (String(url).includes('countryCode=SAU')
-    ? { candidates: [{ address: 'Olaya St, Riyadh', location: { x: 46.68, y: 24.69 }, score: 98, attributes: { Addr_type: 'StreetName' } }] } : {}) });
+  const asked = [];
+  globalThis.fetch = async (url, init) => { asked.push([String(url), init]);
+    return new Response(JSON.stringify({ data: [{ label: 'Al Olaya', coordinates: [24.69, 46.68], precision: 'Locality', score: 99 }] })); };
   try {
-    const [r] = await esriGeocode('Olaya', 'key');
+    const [r] = await geocodePlaces('Olaya St');
     assert.deepEqual(r.coordinates, [24.69, 46.68]);
-    assert.equal(r.precision, 'StreetName');
-    globalThis.fetch = async () => ({ json: async () => ({ error: { code: 498, message: 'Invalid token' } }) });
-    await assert.rejects(esriGeocode('Olaya', 'bad'), /not enabled for this Esri key/);
+    assert.equal(asked[0][0], '/api/v1/imagery/geocode?q=Olaya%20St');
+    globalThis.fetch = async () => new Response(JSON.stringify({ detail: 'Esri rejected this key, or it has no basemap permission.' }), { status: 422 });
+    await assert.rejects(saveImageryKey('synthetic'), /rejected this key/);
   } finally { globalThis.fetch = realFetch; }
-});
-
-test('Esri key: a build-time key wins, a browser key works without a rebuild, placeholders are ignored', async () => {
-  const { readProviderConfig, ESRI_KEY_STORAGE } = await import('../src/lib/map-provider.ts');
-  const store = value => ({ getItem: k => (k === ESRI_KEY_STORAGE ? value : null) });
-  const before = process.env.NEXT_PUBLIC_ARCGIS_API_KEY;
-  try {
-    delete process.env.NEXT_PUBLIC_ARCGIS_API_KEY;
-    assert.deepEqual([readProviderConfig(store(null)).esriKey, readProviderConfig(store(null)).keySource], [null, null]);
-    assert.equal(readProviderConfig(store('YOUR_KEY')).esriKey, null);
-    assert.deepEqual([readProviderConfig(store(' browser ')).esriKey, readProviderConfig(store('browser')).keySource], ['browser', 'browser']);
-    assert.equal(readProviderConfig({ getItem() { throw new Error('blocked'); } }).esriKey, null, 'blocked storage is not fatal');
-    process.env.NEXT_PUBLIC_ARCGIS_API_KEY = 'built';
-    assert.deepEqual([readProviderConfig(store('browser')).esriKey, readProviderConfig(store('browser')).keySource], ['built', 'build']);
-  } finally { if (before === undefined) delete process.env.NEXT_PUBLIC_ARCGIS_API_KEY; else process.env.NEXT_PUBLIC_ARCGIS_API_KEY = before; }
 });

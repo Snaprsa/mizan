@@ -7,21 +7,23 @@ import L from "leaflet";
 import type { MapRecord } from "@/lib/api";
 import { clusterProjected } from "@/lib/map-clustering";
 import type { LatLng } from "@/lib/geo";
-import { esriAttribution, esriAvailableStyles, esriTileUrl, ESRI_STYLES, readProviderConfig } from "@/lib/map-provider";
+import { BASEMAP_LAYERS, getImageryStatus, imageryTileUrl, readOsmConfig, type ImageryStatus } from "@/lib/map-provider";
 import { DEFAULT_CENTER, type Basemap } from "@/lib/map-workspace-state";
 import { arrowDelta, evidenceMarker, subjectMarker, vertexDot } from "./markers";
 import type { Capabilities, RendererHandle, RendererProps } from "./types";
 
 const icon = (html: HTMLElement, size = 34) => L.divIcon({ className: "mizan-leaflet-icon", html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 const OSM_CAPS: Capabilities = { satellite: false, hybrid: false, roadmap: true, terrain: false, geocoding: false };
+const NO_IMAGERY: ImageryStatus = { configured: false, provider: "osm", message: null, capabilities: OSM_CAPS, esri_streets: false, attribution: null };
 
 const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRenderer(props, ref) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layers = useRef<{ evidence?: L.LayerGroup; shapes?: L.LayerGroup; subject?: L.LayerGroup; tiles?: L.LayerGroup }>({});
   const live = useRef(props); live.current = props;
-  const provider = useRef<{ kind: "esri" | "osm"; caps: Capabilities; attribution?: string; reason?: string }>({ kind: "osm", caps: OSM_CAPS });
-  const config = useRef(readProviderConfig());
+  const imagery = useRef<ImageryStatus>(NO_IMAGERY);
+  const attribution = useRef("");
+  const osm = useRef(readOsmConfig());
 
   useEffect(() => {
     if (!container.current) return;
@@ -38,20 +40,9 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     m.on("click", e => live.current.onMapClick([e.latlng.lat, e.latlng.lng]));
     const resize = new ResizeObserver(() => m.invalidateSize()); resize.observe(container.current);
     const controller = new AbortController();
-    const key = config.current.esriKey;
-    if (key) {
-      live.current.onStatus({ provider: "esri", state: "loading", capabilities: OSM_CAPS, imageryNote: "" });
-      esriAvailableStyles(key, controller.signal).then(styles => {
-        const has = (s: string) => !styles || styles.has(s);
-        provider.current = { kind: "esri", caps: { satellite: has(ESRI_STYLES.satellite.base), hybrid: has(ESRI_STYLES.hybrid.base) && has(ESRI_STYLES.hybrid.overlay!),
-          roadmap: has(ESRI_STYLES.roadmap.base), terrain: has(ESRI_STYLES.terrain.base), geocoding: true } };
-        drawTiles();
-      }).catch(e => { if (controller.signal.aborted) return;
-        provider.current = { kind: "osm", caps: OSM_CAPS, reason: (e as Error).message }; drawTiles(); });
-    } else {
-      provider.current = { kind: "osm", caps: OSM_CAPS, reason: "No free Esri key configured" };
-      drawTiles();
-    }
+    drawTiles(); // Standard map straight away; satellite replaces it once the server confirms it.
+    getImageryStatus(controller.signal).then(status => { imagery.current = status; drawTiles(); })
+      .catch(() => { if (!controller.signal.aborted) live.current.onStatus({ provider: "osm", state: "error", configured: false, activeBasemap: "roadmap", esri_streets: false, capabilities: OSM_CAPS, imageryNote: "", message: "The imagery service is unavailable." }); });
     report(); drawShapes(); drawSubject();
     return () => { controller.abort(); resize.disconnect(); m.remove(); map.current = null; layers.current = {}; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,25 +50,27 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
 
   function drawTiles() {
     const m = map.current; const group = layers.current.tiles; if (!m || !group) return;
-    group.clearLayers(); m.attributionControl.removeAttribution(provider.current.attribution || "");
-    const p = provider.current; const key = config.current.esriKey;
-    const basemap: Basemap = p.caps[live.current.basemap] ? live.current.basemap : (["hybrid", "satellite", "roadmap", "terrain"] as Basemap[]).find(b => p.caps[b]) || "roadmap";
+    group.clearLayers(); if (attribution.current) m.attributionControl.removeAttribution(attribution.current);
+    const status = imagery.current; const caps = status.capabilities;
+    const wanted = live.current.basemap;
+    const basemap: Basemap = caps[wanted] ? wanted : (["hybrid", "satellite", "roadmap"] as Basemap[]).find(b => caps[b]) || "roadmap";
+    const usesEsri = status.provider === "esri" && (basemap !== "roadmap" || status.esri_streets);
     let failures = 0;
-    const onError = () => { if (++failures === 4) live.current.onStatus({ provider: p.kind, state: "error", capabilities: p.caps, imageryNote: "",
-      message: p.kind === "esri" ? "Esri tiles stopped loading (key, monthly free allowance, or network)." : "Map tiles are not loading. Your evidence list still works." }); };
-    if (p.kind === "esri" && key) {
-      const style = ESRI_STYLES[basemap];
-      L.tileLayer(esriTileUrl(style.base, key), { maxZoom: 19, attribution: "" }).on("tileerror", onError).addTo(group);
-      if (style.overlay) L.tileLayer(esriTileUrl(style.overlay, key), { maxZoom: 19, attribution: "" }).addTo(group);
-      esriAttribution(style.base, key).then(text => {
-        const attribution = `Powered by Esri${text ? ` | ${text}` : ""}`;
-        provider.current.attribution = attribution; m.attributionControl.addAttribution(attribution);
-        live.current.onStatus({ provider: "esri", state: "ready", capabilities: p.caps, imageryNote: `${attribution}. Esri does not report capture dates for these tiles; none are shown.` });
-      });
+    const report = (state: "ready" | "error", message: string | undefined, imageryNote: string) =>
+      live.current.onStatus({ provider: status.provider, state, configured: status.configured, activeBasemap: basemap, esri_streets: status.esri_streets, capabilities: caps, imageryNote, message });
+    const onError = () => { if (++failures === 4) report("error", usesEsri ? "Esri tiles stopped loading (monthly free allowance, key or network)." : "Map tiles aren’t loading. Your evidence list still works.", ""); };
+    if (usesEsri) {
+      const style = BASEMAP_LAYERS[basemap];
+      L.tileLayer(imageryTileUrl(style.base), { maxZoom: 19 }).on("tileerror", onError).addTo(group);
+      if (style.overlay) L.tileLayer(imageryTileUrl(style.overlay), { maxZoom: 19 }).addTo(group);
+      attribution.current = `Powered by Esri${status.attribution ? ` | ${status.attribution}` : ""}`;
+      report("ready", status.message || undefined, `${attribution.current}. Esri doesn’t report capture dates for these tiles, so none are shown.`);
     } else {
-      L.tileLayer(config.current.osmUrl, { maxZoom: 19, attribution: config.current.osmAttribution }).on("tileerror", onError).addTo(group);
-      live.current.onStatus({ provider: "osm", state: "ready", capabilities: p.caps, imageryNote: "", message: p.reason });
+      L.tileLayer(osm.current.url, { maxZoom: 19 }).on("tileerror", onError).addTo(group);
+      attribution.current = osm.current.attribution;
+      report("ready", status.message || undefined, "");
     }
+    m.attributionControl.addAttribution(attribution.current);
   }
 
   function drawEvidence() {

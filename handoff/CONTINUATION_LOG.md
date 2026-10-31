@@ -1,5 +1,23 @@
 # Continuation log
 
+## 2026-10-31 — Live satellite imagery with a protected key
+
+### Completed behaviour
+- Owner supplied an Esri key and asked for it to be protected and encrypted. Stored in the macOS login Keychain (`api/app/services/secret_store.py`). New `api/app/routers/imagery.py` proxies status, tiles and geocoding, so the browser never sees the key. Replaces the earlier browser-held key (`NEXT_PUBLIC_ARCGIS_API_KEY`, `localStorage`), which could not be protected.
+- This key is authorised for Basemap Styles and geocoding but returns 403 on Static Basemap Tiles, so Satellite uses `ibasemaps-api` World_Imagery. Hybrid/Terrain turn on automatically if that permission is added. Standard uses OSM.
+- Map style panel: real thumbnails, Manage key (replace/remove), explanation of missing permissions.
+- Safeguards: `httpx` logging raised to WARNING (Esri's raster server needs the key in the URL), transport errors and Esri error bodies not passed to clients, layer allowlist, tile bounds, key shape check before the `security -i` stdin command.
+
+### Tests (31 Oct 2026)
+- Backend 112 passed (+8 imagery: no key in responses/errors/logs, capabilities, allowlist, lat/lng order, validation before storing, injection shape). Frontend 17 passed. Lint, type-check, build pass.
+- Live with the real key on :3100: satellite renders over Riyadh; address search returns results; 20 of 20 visible tiles proxied, 0 direct Esri requests, no token in browser URLs, storage or HTML. Key not found in build output, logs, runtime DB, env files or tracked files.
+
+### Remaining
+- The key was pasted into the chat, so it also exists in the session transcript. Owner should regenerate it in Esri and replace it via Manage key.
+- Hybrid/Terrain need the static basemap tiles permission (not verified live). Esri's terms, including commercial use and server-side proxying, not reviewed.
+- Tile route auth is development-identity only; the proxy must stay on loopback.
+
+
 ## 2026-10-31 — UI polish pass and in-app satellite setup (owner request: "improve the UI")
 
 ### Completed behaviour

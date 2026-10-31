@@ -28,19 +28,28 @@ For a controlled migration of actual private data, the owner must transfer their
 
 ## Configuration
 
-### Map imagery — free (Esri ArcGIS Location Platform)
+### Map imagery — free (Esri ArcGIS Location Platform), key held server-side
 
-Decision (28 Oct 2026, owner requirement "must be free"): Google Maps needs a billing-enabled Cloud project, so it was removed. Mizan uses Esri's ArcGIS Location Platform **free tier**: a free account, no payment method needed; pay-as-you-go stays disabled, so usage stops at the monthly allowance instead of being billed (Esri listed 2,000,000 basemap tiles and 20,000 geocode searches per month at the time — check location.arcgis.com/pricing for current figures).
+Google Maps was removed because it needs a billing-enabled project. Mizan uses Esri's free tier: leave pay-as-you-go off so usage stops at the monthly allowance (see location.arcgis.com/pricing for current figures).
 
-1. Sign up at https://location.arcgis.com (free). Do not enable pay-as-you-go.
-2. Create an API key credential with the Basemaps privilege (static basemap tiles) and, for address search, Geocoding (not stored). Privilege names are from Esri's docs and may read slightly differently in its console. If you restrict referrers, allow `http://127.0.0.1:3100/*` and `http://localhost:3100/*`.
-3. In Mizan, open the map style button (top right), paste the key and choose **Turn on satellite**. It is checked against Esri, saved only in that browser (`localStorage`, `mizan.arcgisKey`) and works without a rebuild.
+**Key handling.** The key is stored encrypted in the macOS login Keychain (service `mizan-arcgis-key`, account `mizan`). `api/app/routers/imagery.py` reads it and fetches tiles and geocoding from Esri over HTTPS; the browser only sees `/api/v1/imagery/...`. The key is not in `.env`, the frontend bundle, browser storage, tile URLs or the database. `MIZAN_ARCGIS_API_KEY` overrides the Keychain on hosts that have none. Do not use a `NEXT_PUBLIC_` variable for it: those are public by design.
 
-Optional for every browser on the machine: put `NEXT_PUBLIC_ARCGIS_API_KEY=...` in `Projects/Muqayyim-Downloads/frontend/.env.local` (ignored by Git), rebuild and restart. A build-time key takes precedence over a browser key.
+**Add or replace a key.** Map icon (top right) → paste the key, or **Manage key** → **Replace key**. The API checks it with Esri, then saves it to the Keychain; it is never returned.
 
-Basemaps: Satellite = `arcgis/imagery`, Hybrid = `arcgis/imagery` + `arcgis/imagery/labels`, Standard = `arcgis/streets`, Terrain = `arcgis/outdoor` from the Static Basemap Tiles service. A style is offered only if the service's `/self` listing includes it for your key. Attribution ("Powered by Esri" + the service's copyright text) is read from the service and shown on the map; Esri does not report capture dates, so none are shown. Address search uses Esri World Geocoding without storage: results only move the map, and the user drops/confirms the pin themselves.
+**Which permissions enable what** (checked against the service, cached five minutes; restart the API to recheck sooner):
 
-Without a key (or if Esri rejects it), Mizan shows OpenStreetMap road tiles with a "Standard map · satellite needs a free Esri key" note. `NEXT_PUBLIC_MAP_TILE_URL` / `NEXT_PUBLIC_MAP_ATTRIBUTION` override those fallback tiles.
+| Mode | Source | Needs |
+|---|---|---|
+| Satellite | `ibasemaps-api` World_Imagery raster tiles | Basemap styles permission |
+| Address search | World Geocoding, not stored; results only move the map | Geocoding permission |
+| Hybrid, Terrain, Esri streets | Static Basemap Tiles (`arcgis/imagery/labels`, `arcgis/outdoor`, `arcgis/streets`) | Static basemap tiles permission |
+| Standard | OpenStreetMap unless Esri streets is available | None |
+
+The credit shown on the map is Esri's own `copyrightText`. Esri does not report capture dates for these tiles, so none are shown.
+
+**Limits.** The tile route requires the same identity as other routes; images cannot send an `Authorization` header, so a non-development deployment needs cookie or signed-URL auth first. The launcher binds loopback, so the proxy is local only. Do not expose it publicly as is: it would let others spend the key's allowance.
+
+`NEXT_PUBLIC_MAP_TILE_URL` / `NEXT_PUBLIC_MAP_ATTRIBUTION` override the OpenStreetMap tiles.
 
 ### Other
 
