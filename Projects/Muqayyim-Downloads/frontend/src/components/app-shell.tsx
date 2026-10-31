@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Building2, ChevronsLeft, ChevronsRight, LayoutDashboard, MapPin, PlusCircle, SearchCode } from "lucide-react";
+import { Activity, Building2, ChevronsLeft, ChevronsRight, LayoutDashboard, MapPin, PlusCircle, SearchCode } from "lucide-react";
 import { ToastProvider } from "@/hooks/use-toast";
 
 const NAV = [
   { href: "/map", icon: MapPin, label: "Map & valuation" },
+  { href: "/monitor", icon: Activity, label: "Monitor" },
   { href: "/dashboard", icon: LayoutDashboard, label: "Cases" },
   { href: "/properties", icon: Building2, label: "Properties" },
   { href: "/data", icon: SearchCode, label: "Market data" },
@@ -25,8 +26,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isCollapsed = collapsed ?? narrow;
   const toggle = () => { const next = !isCollapsed; setCollapsed(next); try { localStorage.setItem(KEY, next ? "1" : "0"); } catch { /* ignore */ } };
   if (fullBleed) return <div className="h-screen overflow-hidden"><ToastProvider>{children}</ToastProvider></div>;
-  return <div className="flex h-screen overflow-hidden bg-[#f5f5f7]">
-    <aside className={`${isCollapsed ? "w-14" : "w-52"} flex flex-shrink-0 select-none flex-col border-r border-black/[0.06] bg-white/70 backdrop-blur-xl transition-[width] duration-100`} aria-label="Main navigation">
+  return <div className="flex h-screen overflow-hidden bg-[#f5f5f7] print:block print:h-auto print:overflow-visible print:bg-white">
+    <aside className={`${isCollapsed ? "w-14" : "w-52"} flex flex-shrink-0 select-none flex-col border-r print:hidden border-black/[0.06] bg-white/70 backdrop-blur-xl transition-[width] duration-100`} aria-label="Main navigation">
       <div className="flex h-14 items-center gap-2.5 px-3">
         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#007AFF]"><Building2 className="h-4 w-4 text-white" /></div>
         {!isCollapsed && <div className="truncate text-[15px] font-semibold text-black/85">Mizan <span lang="ar" className="font-normal text-black/40">ميزان</span></div>}
@@ -38,7 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {isCollapsed ? <ChevronsRight size={15} /> : <><ChevronsLeft size={15} /><span>Collapse</span></>}
       </button>
     </aside>
-    <main className="min-w-0 flex-1 overflow-auto"><ToastProvider><div className="mx-auto max-w-5xl px-6 py-8 md:px-10">{children}</div></ToastProvider></main>
+    <main className="min-w-0 flex-1 overflow-auto print:overflow-visible"><ToastProvider><div className="mx-auto max-w-5xl px-6 py-8 md:px-10">{children}</div></ToastProvider></main>
   </div>;
 }
 

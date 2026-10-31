@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from api.app.database import Base
 import api.app.models.foundation  # Register Mizan metadata
+import api.app.models.monitor  # noqa: F401
 from api.app.models import (  # noqa: F401 — import all models so Base.metadata is populated
     Organization, User, Case, Source, ExtractionJob, ExtractedField,
     Comparable, Override, AuditLog,

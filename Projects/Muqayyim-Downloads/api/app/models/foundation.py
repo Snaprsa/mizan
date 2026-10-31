@@ -1,7 +1,7 @@
 """Additive Mizan foundation. Legacy case/comparable tables remain authoritative."""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, JSON, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, JSON, UniqueConstraint, false
 from api.app.database import Base
 from api.app.models import UUID
 
@@ -22,6 +22,7 @@ class Property(Base):
     plot_number = Column(String(100), index=True)
     data = Column(JSON, nullable=False)
     revision = Column(Integer, nullable=False, default=1)
+    is_demo = Column(Boolean, nullable=False, default=False, server_default=false(), index=True)  # Demo portfolio only; never on the map or in Properties.
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 

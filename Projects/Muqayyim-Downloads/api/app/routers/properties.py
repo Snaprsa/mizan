@@ -19,7 +19,7 @@ router = APIRouter(prefix='/properties', tags=['Properties'])
 async def list_properties(q: str = Query('', max_length=255), city: str | None = None,
         property_type: str | None = None, limit: int = Query(50, ge=1, le=200),
         offset: int = Query(0, ge=0), db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
-    filters = [Property.created_by == owner_id(user)]
+    filters = [Property.created_by == owner_id(user), Property.is_demo.is_(False)]
     if q:
         filters.append(or_(*(c.icontains(q, autoescape=True) for c in
             [Property.name, Property.city, Property.district, Property.address, Property.plot_number])))

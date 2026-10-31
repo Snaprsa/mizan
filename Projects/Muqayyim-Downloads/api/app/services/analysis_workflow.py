@@ -64,11 +64,11 @@ def subject_attributes(p):
             'grade_basis': building.get('grade_basis'), 'street_width_m': land.get('street_width_m'), 'corner': land.get('corner')}
 
 
-async def prepare(db, p, user, method=None):
+async def prepare(db, p, user, method=None, as_of=None, evidence=None):
     setup = p.data.get('analysis') or {}
     key = method or setup.get('method') or 'sales_comparison'
     config = method_config(key)
-    as_of = setup.get('as_of') or saudi_today().isoformat()
+    as_of = as_of or setup.get('as_of') or saudi_today().isoformat()
     from datetime import date
     cutoff = date.fromisoformat(as_of)
     radius = setup.get('radius_km', 3)
@@ -121,7 +121,7 @@ async def prepare(db, p, user, method=None):
                  state='missing' if value is None else 'invalid' if error else 'available', error=error)
         fields.append(f)
     # Reuse the existing owner-scoped map projection and all reviewed field overrides.
-    evidence = await map_records(q='', city=None, district=None, property_type=None, case_id=None,
+    if evidence is None: evidence = await map_records(q='', city=None, district=None, property_type=None, case_id=None,
         date_from=None, date_to=None, include_invalid=False, limit=5000,
         south=None, west=None, north=None, east=None, db=db, user=user)
     location = p.data.get('location', {})

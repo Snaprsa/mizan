@@ -25,12 +25,13 @@ The active application is `Projects/Muqayyim-Downloads`. Keep this relative path
 | Sensitivities | Two-way model sensitivities for income, annual DCF, cost and residual; invalid stresses remain unavailable |
 | HBU utility | Experimental sourced-gate / timed-cash-flow screening service with unit tests; not an integrated HBU workspace |
 | Reuse | Income/DCF/cost classes loaded from `Projects/Mizan-Antigravity/src/mizan_engine/approaches` through an adapter |
+| Monitor | `/monitor`: portfolios over existing properties. Indicative values rerun the shared engine only when inputs or evidence change; immutable snapshots; driver attribution by rerun; rule-based High/Medium/Low evidence grade (no percentage); deduplicated, self-resolving alerts; revaluation priority with reasons; NAV/LTV/NOI; stress tests; audit trail; printable report and CSV; opt-in labelled demo fund kept off the map, Properties and real valuations. See `handoff/MIZAN_MONITOR_REPORT.md` |
 | Auth | Local development identity; JWT/persisted-user checks and ownership across property and legacy case/evidence routes, with read-only-role mutation guards. Production authentication and institutional tenancy remain incomplete |
 | Design | Blue/slate palette, dense tables, functional but basic map screen; no completed professional redesign |
 
 ## Real limitations
 
-Satellite imagery (Esri free tier) is verified locally; hybrid and terrain need an extra key permission. There is no parcel/cadastral service, authorized planning lookup, complete GIS, calibrated AVM, connected public transaction feed, full debt/HBU/development workflow, institutional portfolio/reporting/collaboration or complete bilingual translation.
+Satellite imagery (Esri free tier) is verified locally; hybrid and terrain need an extra key permission. There is no parcel/cadastral service, authorized planning lookup, complete GIS, calibrated AVM, connected public transaction feed, full debt/HBU/development workflow, organisation-level tenancy and collaboration, background monitoring, or complete bilingual translation. Monitor checks evidence on demand and when opened; no job runs while the app is closed.
 
 The five connected methods are initial indications, not the complete original platform specification. Sales still requires at least three distinct, active, dated, nearby achieved transactions of the same property type (and three after exclusions); adjustments are reviewer judgements, not market-derived, unless their recorded source says so. Comparables have optional reviewed attributes (floor, position, grade, street width, corner); rates stay the reviewer's and Mizan does not propose them. Rental comparables are not implemented. DCF is annual and unlevered. Residual land is static. Legacy heuristic confidence/ranges are not exposed as calibrated confidence.
 
@@ -62,6 +63,7 @@ These checks do not verify live satellite imagery, provider feeds, professional 
 - `/api/v1/properties`: create/search/detail/replace, case link, assumptions and revisions.
 - `/api/v1/market`: sources, JSON/CSV observations, filtering and local-dataset inventory.
 - `/api/v1/map/records`: owned property/comparable/observation projection, counts, source precision and coverage.
+- `/api/v1/monitor`: portfolios, assets, checks, snapshots, overrides, official valuations, events, alerts, stress, audit and the demo fund.
 - `/api/v1/analysis`: method catalog, start, prepare, save inputs, calculate runs and saved history.
 - Existing `/api/v1/cases`, sources, extraction jobs, comparables/overrides/status, export routes.
 

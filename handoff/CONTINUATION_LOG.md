@@ -1,5 +1,16 @@
 # Continuation log
 
+## 31 October 2026: Mizan Monitor
+
+Added portfolio monitoring on top of the existing valuation pipeline; no second engine. Full report: `handoff/MIZAN_MONITOR_REPORT.md`.
+
+- Migration `20261031_mizan_monitor` (additive): `portfolios`, `portfolio_assets`, `valuation_snapshots`, `monitor_events`, `monitor_alerts`, `properties.is_demo`. Rehearsed on a backup copy: counts unchanged, integrity ok.
+- Backend: `api/app/models/monitor.py`, `services/monitor_calc.py` (pure), `services/monitor.py`, `services/monitor_demo.py`, `routers/monitor.py`, `tests/test_monitor.py`. `prepare()` gained optional `as_of` and `evidence`. Map and Properties exclude `is_demo` properties.
+- Frontend: `/monitor`, `/monitor/[id]`, `/monitor/[id]/report`, `/monitor/assets/[assetId]`, `components/monitor/{ui,charts}.tsx`, `lib/monitor.ts`, `tests/monitor.test.mjs`.
+- Checks: 132 backend, 24 frontend, type-check, lint, production build. Browser on a disposable API: dashboard, attention list, asset page, override with reason, audit trail, stress, priority, report, chart, phone width, new portfolio and add property. Timing with 10,000 synthetic assets and 80,000 snapshots: dashboard 0.63 s, asset list 0.32 s. Scanning at that size was not timed.
+- Not verified: printing to PDF on paper, a real portfolio with real official valuations, any live Saudi data feed.
+- Next: CSV bulk import of assets and official valuations; rental evidence as a record type; background checks; organisation access; debt terms for interest-rate stress and covenants.
+
 ## 2026-10-31 — Simple, accurate comparable adjustment by property type
 
 ### Completed behaviour

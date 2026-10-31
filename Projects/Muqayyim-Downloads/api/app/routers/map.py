@@ -111,7 +111,7 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
             'source': url or filename or 'Manual / unspecified source', 'source_id': str(c.source_id),
             'attributes': c.attributes or {}, 'reliability_score': c.reliability_score, 'case_id': str(c.case_id),
             'href': '/cases/'+str(c.case_id)})
-    props = (await db.scalars(select(Property).where(Property.created_by == owner_id(user))
+    props = (await db.scalars(select(Property).where(Property.created_by == owner_id(user), Property.is_demo.is_(False))
                               .order_by(Property.updated_at.desc()))).all()
     for p in props:
         if case_id and p.case_id != case_id:

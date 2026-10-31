@@ -26,7 +26,7 @@ const n0 = new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 });
 // Unicode isolate: stops an Arabic district from flipping a neighbouring date (2027-02-04 shown as 04-02-2027).
 const isolate = (s: string | null | undefined) => `\u2068${s ?? ""}\u2069`;
 const label = (s: string) => s.replaceAll("_", " ").replace(/^./, c => c.toUpperCase());
-const NAV = [{ href: "/dashboard", label: "Cases" }, { href: "/properties", label: "Properties" }, { href: "/data", label: "Market data" }, { href: "/cases/new", label: "New case" }];
+const NAV = [{ href: "/monitor", label: "Monitor" }, { href: "/dashboard", label: "Cases" }, { href: "/properties", label: "Properties" }, { href: "/data", label: "Market data" }, { href: "/cases/new", label: "New case" }];
 type Sheet = "peek" | "half" | "full";
 
 function MapWorkspace() {

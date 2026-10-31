@@ -9,8 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.app.config import get_settings
-from api.app.routers import cases, sources, extractions, comparables, exports, properties, market, analysis, imagery, evidence, map as intelligence_map
+from api.app.routers import cases, sources, extractions, comparables, exports, properties, market, analysis, imagery, evidence, monitor, map as intelligence_map
 import api.app.models.foundation  # Register additive Mizan models
+import api.app.models.monitor  # noqa: F401
 
 settings = get_settings()
 
@@ -50,6 +51,7 @@ app.include_router(analysis.router, prefix="/api/v1")
 app.include_router(intelligence_map.router, prefix="/api/v1")
 app.include_router(imagery.router, prefix="/api/v1")
 app.include_router(evidence.router, prefix="/api/v1")
+app.include_router(monitor.router, prefix="/api/v1")
 app.include_router(properties.router, prefix="/api/v1")
 app.include_router(market.router, prefix="/api/v1")
 app.include_router(cases.router, prefix="/api/v1/cases", tags=["Cases"])
