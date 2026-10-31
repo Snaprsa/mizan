@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { PreparedAnalysis, ValuationMethod, AnalysisInput, AnalysisResult, prepareAnalysis, saveAnalysisInputs, calculateAnalysis, getAnalysisRuns } from "@/lib/api";
 
@@ -8,10 +9,8 @@ import AdjustmentGrid from "./adjustment-grid";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
-export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0, embedded = false }: {
+export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0 }: {
   propertyId: string; methods: ValuationMethod[]; onPrepared: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void;
-  /** Rendered inside the map card: no outer panel chrome or duplicate title. */
-  embedded?: boolean;
   /** Increment after another screen changes the property (e.g. map geometry) to adopt its new revision. */
   refreshKey?: number;
 }) {
@@ -90,27 +89,27 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
   }
   if (!prepared) return <section className="mizan-panel !p-4">{error ? <p role="alert" className="mizan-error">{error}</p> : <p role="status" className="text-sm">Gathering evidence and required inputs…</p>}</section>;
   const resultCurrent = result && savedRunMatchesPrepared(prepared, result) && preparedSignature(prepared) === signature;
-  return <section className={embedded ? "mizan-embedded space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/[0.05]" : "mizan-panel !p-4 space-y-3 border-blue-300"} aria-label="Valuation workspace">
-    {embedded && result && <div className="rounded-xl bg-black/[0.03] px-3 py-3">
-      <p className="text-[12px] text-black/50">{resultCurrent ? "Estimated value" : "Last saved value · inputs have changed since"}</p>
-      <p className={`text-[30px] font-semibold tracking-tight leading-tight ${resultCurrent ? "text-black/90" : "text-black/40"}`}>SAR {new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(result.outputs.value)}</p>
-      <p className="text-[12px] text-black/45">{methods.find(m => m.key === result.method)?.label || result.method} · as of {result.data_date}</p></div>}
-    {embedded && !result && <p className="rounded-xl bg-black/[0.03] px-3 py-3 text-[13px] text-black/55">{prepared.ready ? "Ready — calculating…" : `Still needed: ${prepared.gaps.length} item${prepared.gaps.length === 1 ? "" : "s"} (listed below).`}</p>}
-    {embedded ? <p className="text-[12px] text-black/40">Revision {prepared.revision}</p> : <div><h2 className="font-semibold text-sm">Valuation workspace</h2><p className="text-xs text-slate-500 mt-1">{prepared.property_name} · Revision {prepared.revision}</p></div>}
+  const money = (n: number) => `SAR ${new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(n)}`;
+  const range = result?.outputs.evidence?.indication as { low: number; high: number } | undefined;
+  const grid = prepared.adjustment_analysis;
+  const applied = grid ? grid.rows.reduce((n, r) => n + r.steps.length, 0) : 0;
+  return <div className="space-y-3" aria-label="Valuation workspace">
+    {/* The answer first. */}
+    <section className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.05]" aria-live="polite">
+      {result ? <>
+        <p className="text-[13px] text-black/50">{resultCurrent ? "Estimated value" : "Last saved value · inputs have changed since"}</p>
+        <p className={`mt-0.5 text-[32px] font-semibold leading-tight tracking-tight ${resultCurrent ? "text-black/90" : "text-black/35"}`}>{money(result.outputs.value)}</p>
+        {range && <p className="mt-1 text-[13px] text-black/55">Middle half of sales: {money(range.low)} – {money(range.high)}</p>}
+        <p className="mt-1 text-[12px] text-black/40">{methods.find(m => m.key === result.method)?.label || result.method} · as of {result.data_date}</p>
+      </> : <><p className="text-[15px] font-semibold text-black/85">{busy ? "Calculating…" : prepared.ready ? (automatic ? "Almost there" : "Ready to calculate") : "A few things are needed"}</p>
+        <p className="mt-0.5 text-[13px] text-black/50">{prepared.ready ? "Your value will appear here." : "Complete the items below and your value will appear here."}</p></>}
+    </section>
     {error && <div className="mizan-error" role="alert">{error}<button type="button" className="underline block mt-2" onClick={() => { setError(""); prepareAnalysis(propertyId, method).then(hydrate).catch(e => setError(e.message)); }}>Reload saved inputs</button></div>}
-    {/* Settings stay one tap away; the summary line shows their current values. */}
-    <details className="group rounded-xl bg-black/[0.03] px-3 py-2">
-      <summary className="cursor-pointer list-none text-[13px] text-black/60"><span className="font-medium text-black/80">Settings</span> · {methods.find(m => m.key === method)?.label} · {asOf} · {radius} km · {lookback} days{automatic ? " · auto" : ""}</summary>
-      <div className="mt-2 space-y-2">
-      <label className="mizan-label">Valuation approach<select aria-label="Valuation approach" className="mizan-input" value={method} disabled={busy} onChange={e => changeMethod(e.target.value)}>{methods.map(m => <option key={m.key} value={m.key} disabled={!m.implemented}>{m.label}{!m.implemented ? " · not yet implemented" : ""}</option>)}</select></label>
-      <p className="text-xs text-slate-500">{prepared.description}</p>
-      <label className="text-xs flex gap-2 items-center"><input type="checkbox" checked={automatic} onChange={e => setAutomatic(e.target.checked)} />Calculate automatically when required inputs are complete</label>
-      <div className="grid grid-cols-2 gap-2"><label className="mizan-label">Valuation date<input className="mizan-input" type="date" value={asOf} onChange={e => { setAsOf(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence radius (km)<input className="mizan-input" type="number" min="0.1" max="50" step="0.1" value={radius} onChange={e => { setRadius(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence lookback (days)<input className="mizan-input" type="number" min="1" max="3650" value={lookback} onChange={e => { setLookback(e.target.value); setError(""); }} /></label></div>
-      <p className="text-[10px] text-slate-500">Typing a missing value marks it as a user assumption at the selected valuation date. Source and date remain editable.</p>
-      </div>
-    </details>
-    <div className="max-h-[480px] overflow-y-auto space-y-3 pr-1" aria-label="Approach-specific required inputs">
-      {prepared.fields.map(f => <div key={f.key} className="border-t border-slate-100 pt-3 space-y-2"><label className="mizan-label">{f.label} ({f.unit})<input aria-label={f.label} className="mizan-input" type="number" step={f.key === "holding_years" ? "1" : "any"} min={f.minimum} max={f.maximum ?? undefined} value={draft[f.key]?.value ?? ""} onChange={e => {
+    {!!prepared.gaps.length && <section className="rounded-2xl bg-[#FF9F0A]/10 px-4 py-3 text-[13px] text-[#8a5300]"><h3 className="font-semibold">Still needed</h3><ul className="mt-1 list-disc space-y-0.5 pl-4">{prepared.gaps.map(g => <li key={g}>{g}</li>)}</ul></section>}
+
+    {/* What this approach needs from you. */}
+    {!!prepared.fields.length && <section className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/[0.05]" aria-label="Approach-specific required inputs">
+      {prepared.fields.map(f => <div key={f.key} className="space-y-1.5"><label className="mizan-label">{f.label} ({f.unit === "sqm" ? "m²" : f.unit})<input aria-label={f.label} className="mizan-input" type="number" step={f.key === "holding_years" ? "1" : "any"} min={f.minimum} max={f.maximum ?? undefined} value={draft[f.key]?.value ?? ""} onChange={e => {
           const previous = draft[f.key] || { value: "", source: "", as_of: "" };
           const raw = e.target.value; const isOriginal = raw !== "" && f.value != null && Number(raw) === f.value;
           const changesSourcedValue = raw !== "" && f.value != null && !isOriginal && (previous.source === f.source || previous.source.startsWith("User override of:"));
@@ -120,8 +119,8 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
         }} /></label>
         {f.unit === "ratio" && <p className="text-[10px] text-slate-400">Use 0.08 for 8%. Enter 0 explicitly where applicable.</p>}
         {/* Provenance is always recorded; it opens by itself when something is missing. */}
-        <details open={!f.source || !f.as_of ? true : undefined}>
-          <summary className="cursor-pointer list-none text-[12px] text-black/45">Source: <span className="text-black/65">{draft[f.key]?.source?.trim() || "not set"}</span>{draft[f.key]?.as_of ? ` · ${draft[f.key].as_of}` : ""} <span className="text-[#007AFF]">Edit</span></summary>
+        <details open={f.value != null && (!f.source || !f.as_of) ? true : undefined}>
+          <summary className="mizan-summary cursor-pointer text-[12px] text-black/45">Source: <span className="text-black/65">{draft[f.key]?.source?.trim() || "added when you enter a value"}</span>{draft[f.key]?.as_of ? ` · ${draft[f.key].as_of}` : ""} <span className="text-[#007AFF]">Edit</span></summary>
           <div className="mt-2 space-y-2">
             <label className="mizan-label">Source for {f.label}<input className="mizan-input !text-xs" value={draft[f.key]?.source ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], source: e.target.value } }); setError(""); }} placeholder="Source / user assumption" /></label>
             <label className="mizan-label">Source date for {f.label}<input className="mizan-input" type="date" value={draft[f.key]?.as_of ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], as_of: e.target.value } }); setError(""); }} /></label>
@@ -129,14 +128,47 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
           </div>
         </details>
       </div>)}
+      <p className="text-[11.5px] text-black/40">A value you type is recorded as your own assumption.</p>
+    </section>}
+    {!automatic && <button type="button" disabled={busy || !complete} className="w-full rounded-xl bg-[#007AFF] px-4 py-3 text-[16px] font-semibold text-white active:opacity-80 disabled:bg-black/10 disabled:text-black/35" onClick={() => perform(true)}>{busy ? "Calculating…" : "Calculate"}</button>}
+    {notice && <p role="status" className="px-1 text-[12.5px] text-[#248a3d]">{notice}</p>}
+
+    {/* Everything else is one tap away. */}
+    <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.05]">
+      {method === "sales_comparison" && grid && <Disclosure title="Adjust comparables" detail={applied ? `${applied} applied` : `${grid.rows.length} sales`}>
+        <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} /></Disclosure>}
+      <Disclosure title="Evidence used" detail={method === "sales_comparison" ? `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable` : `${prepared.candidates.length} nearby`} defaultOpen={method === "sales_comparison" && !grid}>
+        <p className="text-[12.5px] text-black/50">Within {prepared.radius_km} km. Listings and draft, undated or repeated records are not used as achieved sales.</p>
+        <div className="mt-2 max-h-56 divide-y divide-black/[0.05] overflow-auto">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block w-full py-1.5 text-left" onClick={() => onSelectEvidence(c.id)}><span className="block truncate text-[14px] text-black/80" dir="auto">{c.title}</span><span className={`block text-[12px] ${c.eligible ? "text-[#248a3d]" : "text-black/45"}`}>{c.distance_km} km · {c.eligible ? "Used" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="py-2 text-[13px] text-black/45">No located evidence within this radius.</p>}</div>
+        <button type="button" className="mt-2 text-[13px] text-[#007AFF] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
+      </Disclosure>
+      {result && <Disclosure title="How this was calculated">
+        <ul className="list-disc space-y-1 pl-4 text-[12.5px] text-black/55">{result.outputs.limitations.map(l => <li key={l}>{l}</li>)}</ul>
+        <SensitivityTable sensitivity={result.outputs.sensitivity} />
+        <details className="mt-2"><summary className="cursor-pointer text-[12.5px] text-black/45">Technical details</summary><pre className="mt-1 max-h-52 overflow-auto rounded-lg bg-black/[0.03] p-2 text-[11px]">{JSON.stringify(result.outputs.evidence, null, 2)}</pre></details>
+      </Disclosure>}
+      {!!runs.length && <Disclosure title="Saved calculations" detail={String(runs.length)}>
+        <ul className="divide-y divide-black/[0.05]">{runs.map(r => <li key={r.id}><button type="button" className="w-full py-1.5 text-left text-[13.5px] text-[#007AFF]" onClick={() => setResult({ ...r.data, id: r.id, created_at: r.created_at })}>{new Date(r.created_at).toLocaleString()}<span className="block text-[12px] text-black/45">{methods.find(m => m.key === r.data.method)?.label || r.data.method} · {money(r.data.outputs.value)} · revision {r.data.property_revision}</span></button></li>)}</ul>
+      </Disclosure>}
+      <Disclosure title="Settings" detail={`${asOf} · ${radius} km`}>
+        <div className="space-y-2.5">
+          <label className="mizan-label">Valuation approach<select aria-label="Valuation approach" className="mizan-input" value={method} disabled={busy} onChange={e => changeMethod(e.target.value)}>{methods.map(m => <option key={m.key} value={m.key} disabled={!m.implemented}>{m.label}{!m.implemented ? " · not available yet" : ""}</option>)}</select></label>
+          <p className="text-[12px] text-black/45">{prepared.description}</p>
+          <div className="grid grid-cols-2 gap-2"><label className="mizan-label">Valuation date<input className="mizan-input" type="date" value={asOf} onChange={e => { setAsOf(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence radius (km)<input className="mizan-input" type="number" min="0.1" max="50" step="0.1" value={radius} onChange={e => { setRadius(e.target.value); setError(""); }} /></label><label className="mizan-label col-span-2">Look back (days)<input className="mizan-input" type="number" min="1" max="3650" value={lookback} onChange={e => { setLookback(e.target.value); setError(""); }} /></label></div>
+          <label className="flex items-center gap-2 text-[13.5px] text-black/70"><input type="checkbox" checked={automatic} onChange={e => setAutomatic(e.target.checked)} />Calculate automatically</label>
+          <button type="button" disabled={busy} className="block text-[13.5px] text-[#007AFF] disabled:opacity-40" onClick={() => perform(false)}>Save without calculating</button>
+          <p className="text-[11.5px] text-black/40">Revision {prepared.revision}</p>
+          <Link href={`/properties/${propertyId}`} className="block text-[13.5px] text-[#007AFF]">Open full property details</Link>
+        </div>
+      </Disclosure>
     </div>
-    <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="text-xs px-3 py-2 border rounded disabled:opacity-50" onClick={() => perform(false)}>Save inputs</button><button type="button" disabled={busy || !complete} className="mizan-button !text-xs" onClick={() => perform(true)}>{busy ? "Processing…" : "Calculate now"}</button><button type="button" className="text-xs text-blue-700" disabled={busy} onClick={refresh}>Refresh evidence</button></div>
-    {notice && <p role="status" className="text-xs text-green-800">{notice}</p>}
-    {!!prepared.gaps.length && <details open className="bg-amber-50 p-3 rounded text-xs text-amber-900"><summary className="font-medium cursor-pointer">Still required / last saved readiness</summary><ul className="list-disc pl-4 mt-2 space-y-1">{prepared.gaps.map(g => <li key={g}>{g}</li>)}</ul></details>}
-    {method === "sales_comparison" && prepared.adjustment_analysis && <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} />}
-    <details className="text-xs" open={method === "sales_comparison" && !prepared.adjustment_analysis}><summary className="font-medium cursor-pointer">Nearby evidence: {prepared.candidates.length} records · {prepared.eligible_comparables.length} eligible achieved sales</summary><p className="text-slate-500 mt-2">Within {prepared.radius_km} km. Listings and draft / undated / repeated evidence are not used as achieved sales.</p><div className="max-h-48 overflow-auto mt-2 space-y-2">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block text-left border rounded p-2 w-full" onClick={() => onSelectEvidence(c.id)}><span className="font-medium">{c.title}</span><span className="block text-slate-500">{c.distance_km} km · {c.eligible ? "Eligible achieved sale" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="text-slate-500">No located comparable evidence in this radius.</p>}</div></details>
-    {result && <div className="border-t border-slate-200 pt-3"><p className="text-xs text-slate-500">{resultCurrent ? "Current saved indication" : "Previous saved result · inputs may have changed"}</p><p className="text-xl font-semibold mt-1">SAR {new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(result.outputs.value)}</p><p className="text-[10px] text-slate-500">{result.method} · property revision {result.property_revision} · {result.data_date}</p>{result.outputs.limitations.map(l => <p key={l} className="text-[11px] text-slate-500 mt-1">{l}</p>)}<SensitivityTable sensitivity={result.outputs.sensitivity} /><details className="mt-2 text-xs"><summary>Calculation details</summary><pre className="overflow-auto max-h-52 bg-slate-50 p-2 mt-2">{JSON.stringify(result.outputs.evidence, null, 2)}</pre></details></div>}
-    {!!runs.length && <details className="text-xs"><summary className="cursor-pointer">Saved calculations ({runs.length})</summary><ul className="space-y-2 mt-2">{runs.map(r => <li key={r.id}><button className="text-blue-700" onClick={() => setResult({ ...r.data, id: r.id, created_at: r.created_at })}>{r.data.method} · revision {r.data.property_revision} · {new Date(r.created_at).toLocaleString()}</button></li>)}</ul></details>}
-    <div className="flex gap-3 text-xs"><Link href={`/properties/${propertyId}`} className="text-blue-700 underline">Full property workspace</Link></div>
-  </section>;
+  </div>;
+}
+
+function Disclosure({ title, detail, defaultOpen, children }: { title: string; detail?: string; defaultOpen?: boolean; children: ReactNode }) {
+  return <details open={defaultOpen ? true : undefined}>
+    <summary className="mizan-summary flex min-h-[44px] cursor-pointer items-center gap-2 px-4 py-2 text-[15px] text-black/85 hover:bg-black/[0.02]"><span className="flex-1">{title}</span>
+      {detail && <span className="text-[14px] text-black/40">{detail}</span>}<ChevronRight size={15} className="mizan-chevron shrink-0 text-black/25 transition-transform" /></summary>
+    <div className="px-4 pb-3 pt-1">{children}</div>
+  </details>;
 }

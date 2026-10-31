@@ -33,9 +33,10 @@ For a controlled migration of actual private data, the owner must transfer their
 Decision (28 Oct 2026, owner requirement "must be free"): Google Maps needs a billing-enabled Cloud project, so it was removed. Mizan uses Esri's ArcGIS Location Platform **free tier**: a free account, no payment method needed; pay-as-you-go stays disabled, so usage stops at the monthly allowance instead of being billed (Esri listed 2,000,000 basemap tiles and 20,000 geocode searches per month at the time — check location.arcgis.com/pricing for current figures).
 
 1. Sign up at https://location.arcgis.com (free). Do not enable pay-as-you-go.
-2. Create an API key credential with the **Basemaps** privilege (static basemap tiles) and, for address search, **Geocoding (not stored)**. Restrict its referrers to `http://127.0.0.1:3100/*` and `http://localhost:3100/*`.
-3. Put it in `Projects/Muqayyim-Downloads/frontend/.env.local` (ignored by Git): `NEXT_PUBLIC_ARCGIS_API_KEY=...`
-4. `npm --prefix Projects/Muqayyim-Downloads/frontend run build`, then restart the launcher.
+2. Create an API key credential with the Basemaps privilege (static basemap tiles) and, for address search, Geocoding (not stored). Privilege names are from Esri's docs and may read slightly differently in its console. If you restrict referrers, allow `http://127.0.0.1:3100/*` and `http://localhost:3100/*`.
+3. In Mizan, open the map style button (top right), paste the key and choose **Turn on satellite**. It is checked against Esri, saved only in that browser (`localStorage`, `mizan.arcgisKey`) and works without a rebuild.
+
+Optional for every browser on the machine: put `NEXT_PUBLIC_ARCGIS_API_KEY=...` in `Projects/Muqayyim-Downloads/frontend/.env.local` (ignored by Git), rebuild and restart. A build-time key takes precedence over a browser key.
 
 Basemaps: Satellite = `arcgis/imagery`, Hybrid = `arcgis/imagery` + `arcgis/imagery/labels`, Standard = `arcgis/streets`, Terrain = `arcgis/outdoor` from the Static Basemap Tiles service. A style is offered only if the service's `/self` listing includes it for your key. Attribution ("Powered by Esri" + the service's copyright text) is read from the service and shown on the map; Esri does not report capture dates, so none are shown. Address search uses Esri World Geocoding without storage: results only move the map, and the user drops/confirms the pin themselves.
 

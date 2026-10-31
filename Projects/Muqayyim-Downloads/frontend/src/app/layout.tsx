@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             to prevent "Extra attributes from server" hydration mismatches. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){var h=document.documentElement;h.removeAttribute('data-kantu');var o=new MutationObserver(function(ms){ms.forEach(function(m){if(m.attributeName==='data-kantu')h.removeAttribute('data-kantu');});});o.observe(h,{attributes:true});})();` }} />
       </head>
-      <body className="bg-slate-50 text-slate-900 antialiased" suppressHydrationWarning>
+      <body className="bg-[#f5f5f7] text-[#1d1d1f] antialiased" suppressHydrationWarning>
         <AppShell>{children}</AppShell>
       </body>
     </html>

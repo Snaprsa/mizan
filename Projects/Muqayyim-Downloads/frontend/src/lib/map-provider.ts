@@ -16,15 +16,26 @@ export const ESRI_STYLES: Record<Basemap, { base: string; overlay?: string }> = 
   terrain: { base: "arcgis/outdoor" },
 };
 
-export type ProviderConfig = { esriKey: string | null; osmUrl: string; osmAttribution: string };
+export type ProviderConfig = { esriKey: string | null; keySource: "build" | "browser" | null; osmUrl: string; osmAttribution: string };
+type KeyStore = Pick<Storage, "getItem">;
 
-export function readProviderConfig(): ProviderConfig {
-  const key = (process.env.NEXT_PUBLIC_ARCGIS_API_KEY || "").trim();
+/** A key pasted into the map style panel lives only in this browser's storage. */
+export const ESRI_KEY_STORAGE = "mizan.arcgisKey";
+const browserStore = (): Storage | undefined => { try { return typeof window === "undefined" ? undefined : window.localStorage; } catch { return undefined; } };
+const usableKey = (k: string | null | undefined) => { const v = (k || "").trim(); return v && !/^YOUR_/i.test(v) ? v : null; };
+
+export function readProviderConfig(store: KeyStore | undefined = browserStore()): ProviderConfig {
+  const built = usableKey(process.env.NEXT_PUBLIC_ARCGIS_API_KEY);
+  let stored: string | null = null;
+  try { stored = usableKey(store?.getItem(ESRI_KEY_STORAGE)); } catch { /* storage unavailable */ }
   return {
-    esriKey: key && !/^YOUR_/i.test(key) ? key : null,
+    esriKey: built || stored, keySource: built ? "build" : stored ? "browser" : null,
     osmUrl: process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     osmAttribution: process.env.NEXT_PUBLIC_MAP_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   };
+}
+export function storeEsriKey(key: string | null): void {
+  try { if (key) browserStore()?.setItem(ESRI_KEY_STORAGE, key.trim()); else browserStore()?.removeItem(ESRI_KEY_STORAGE); } catch { /* storage unavailable */ }
 }
 
 export const esriTileUrl = (style: string, key: string) => `${ESRI_TILES}${style}/static/tile/{z}/{y}/{x}?token=${encodeURIComponent(key)}`;
@@ -37,7 +48,8 @@ export async function esriAvailableStyles(key: string, signal?: AbortSignal): Pr
     ? "Esri rejected the API key (invalid, expired, or missing the basemap privilege)." : body.error.message || "Esri basemap service error");
   const styles = new Set<string>();
   for (const s of body.styles || []) if (typeof s.path === "string") styles.add(s.path.replace(/^\//, ""));
-  return styles.size ? styles : null;
+  // Only trust the listing if it names styles the way we request them; otherwise let the tiles decide.
+  return styles.has(ESRI_STYLES.satellite.base) || styles.has(ESRI_STYLES.roadmap.base) ? styles : null;
 }
 
 /** Provider copyright text for a style; never invented. */

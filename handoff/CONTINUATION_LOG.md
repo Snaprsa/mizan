@@ -1,5 +1,25 @@
 # Continuation log
 
+## 2026-10-31 — UI polish pass and in-app satellite setup (owner request: "improve the UI")
+
+### Completed behaviour
+- Satellite setup in the app: the map style panel shows three steps and a password-type field; the key is checked against Esri's `/self`, stored only in this browser (`mizan.arcgisKey`), applied with no rebuild, and removable. A build-time key still wins. The app never handles the Esri account password; sign-up stays with the owner.
+- Style tiles use real map thumbnails instead of grey gradients. `/self` styles only gate modes if the listing names our style paths (its shape is unverified without a key).
+- Map: tip-anchored subject pin; plain coloured dots; SAR/m² value pills at zoom >= 15; markers centred on their coordinates (they were slightly offset); fit/search frame the area not covered by the card or sheet; first load opens Explore, or the valuation in the URL.
+- Valuation: value and middle-half range first, "Still needed", inputs, then disclosure rows (Adjust comparables, Evidence used, How this was calculated, Saved calculations, Settings). One Calculate button only when automatic is off. Adjustment statistics are a readable Raw/Adjusted table; raw JSON sits under Technical details.
+- Shell and pages: light sidebar; "Not yet implemented" links removed from navigation (the stub routes still exist); Properties, Cases and Market data show data first with forms behind a button or disclosure; fade-in animation removed (content sat at opacity 0 when animations were paused).
+- Fix: Unicode isolates stop Arabic text reordering dates in Explore rows.
+- Launcher now started detached with `nohup` (log `Projects/Muqayyim-Downloads/logs/mizan-launcher.log`) because the previous background launcher stopped with the session. To stop it, TERM the `bash run_mizan.sh` process.
+
+### Tests (31 Oct 2026)
+- Backend 104 passed; frontend 18 passed (+ key precedence/placeholder/blocked storage); lint, type-check, production build pass.
+- Browser (synthetic data, disposable API :8100, dev :3101 `.next-dev`): style panel, rejected key with a stubbed Esri response (not stored, message shown, nothing sent to Esri), framing, pin, valuation screens, Properties, Cases, case detail, Market data, 375 px phone layouts with no horizontal scroll. Real data viewed read-only on :3100 (19 records unchanged).
+- Not verified: a real Esri key, live imagery, thumbnails with a key, address search. `docs/verify_*.py` remain outdated. Esri's terms of use, including commercial use on the free tier, have not been reviewed.
+
+### Next step
+Owner signs up and pastes the key in the map style panel; then verify satellite over Riyadh. Then structured comparable attributes and cross-method reconciliation.
+
+
 ## 2026-10-28 — Free imagery + Apple-style redesign (owner request)
 
 ### Decisions

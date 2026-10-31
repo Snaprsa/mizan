@@ -44,10 +44,9 @@ export default function AdjustmentGrid({ propertyId, prepared, disabled, onSaved
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 
-  return <section className="border border-slate-200 rounded p-3 space-y-3 text-xs" aria-label="Comparable adjustment grid">
+  return <section className="space-y-3 text-xs" aria-label="Comparable adjustment grid">
     <div className="flex items-start justify-between gap-2">
-      <div><h3 className="font-semibold text-slate-800">Adjustment grid</h3>
-        <p className="text-slate-500">SAR per m² of each comparable. Only approved adjustments are applied.</p></div>
+      <p className="text-[12.5px] text-black/50">Unit values are SAR per m². Only adjustments you approve are applied.</p>
       {dirty && <span className="mizan-chip !bg-amber-50 !border-amber-200 !text-amber-900">Unsaved changes</span>}
     </div>
 
@@ -60,10 +59,16 @@ export default function AdjustmentGrid({ propertyId, prepared, disabled, onSaved
         {a.indication ? <><p className="text-base font-semibold">SAR {n0.format(a.indication.base)}</p>
           <p className="text-[10px] text-slate-500">IQR {n0.format(a.indication.low)} – {n0.format(a.indication.high)} · not a confidence interval</p></> : <p className="text-slate-500">Needs subject area and a valid grid</p>}</div>
     </div>
-    {a.raw && a.adjusted && <table className="w-full text-[11px] [&_td]:py-0.5 [&_th]:text-left [&_th]:font-medium [&_th]:text-slate-500"><thead><tr><th></th><th>Mean</th><th>Median</th><th>W. mean</th><th>W. median</th><th>IQR</th><th>CV</th></tr></thead>
-      <tbody><tr><td className="text-slate-500">Raw</td><td>{n0.format(a.raw.mean)}</td><td>{n0.format(a.raw.median)}</td><td>—</td><td>—</td><td>{n0.format(a.raw.p25)}–{n0.format(a.raw.p75)}</td><td>{pct(a.raw.cv, 0)}</td></tr>
-        <tr><td className="text-slate-500">Adjusted</td><td>{n0.format(a.adjusted.mean)}</td><td>{n0.format(a.adjusted.median)}</td><td>{a.adjusted.weighted_mean == null ? "—" : n0.format(a.adjusted.weighted_mean)}</td>
-          <td>{a.adjusted.weighted_median == null ? "—" : n0.format(a.adjusted.weighted_median)}</td><td>{n0.format(a.adjusted.p25)}–{n0.format(a.adjusted.p75)}</td><td>{pct(a.adjusted.cv, 0)}</td></tr></tbody></table>}
+    {a.raw && a.adjusted && <table className="w-full text-[12px] tabular-nums [&_td]:py-1 [&_td:not(:first-child)]:text-right [&_th]:pb-1 [&_th]:font-medium [&_th]:text-black/40 [&_th:not(:first-child)]:text-right [&_tr]:border-b [&_tr]:border-black/[0.05]">
+      <thead><tr><th className="text-left">SAR/m²</th><th>Raw</th><th>Adjusted</th></tr></thead>
+      <tbody>
+        <tr><td className="text-black/55">Median</td><td>{n0.format(a.raw.median)}</td><td>{n0.format(a.adjusted.median)}</td></tr>
+        <tr><td className="text-black/55">Mean</td><td>{n0.format(a.raw.mean)}</td><td>{n0.format(a.adjusted.mean)}</td></tr>
+        <tr><td className="text-black/55">Weighted median</td><td>—</td><td>{a.adjusted.weighted_median == null ? "—" : n0.format(a.adjusted.weighted_median)}</td></tr>
+        <tr><td className="text-black/55">Weighted mean</td><td>—</td><td>{a.adjusted.weighted_mean == null ? "—" : n0.format(a.adjusted.weighted_mean)}</td></tr>
+        <tr><td className="text-black/55">Middle half</td><td>{n0.format(a.raw.p25)}–{n0.format(a.raw.p75)}</td><td>{n0.format(a.adjusted.p25)}–{n0.format(a.adjusted.p75)}</td></tr>
+        <tr><td className="text-black/55">Spread (CV)</td><td>{pct(a.raw.cv, 0)}</td><td>{pct(a.adjusted.cv, 0)}</td></tr>
+      </tbody></table>}
     {!!a.gaps.length && <ul className="list-disc pl-4 text-amber-900">{a.gaps.map(g => <li key={g}>{g}</li>)}</ul>}
     {a.pending_count > 0 && <p className="text-amber-800">{a.pending_count} proposed adjustment(s) saved but not approved — not applied.</p>}
     {a.orphaned_lines.length > 0 && <p className="text-amber-800">{a.orphaned_lines.length} saved adjustment(s) refer to comparables that are no longer eligible and are ignored.</p>}
@@ -92,7 +97,7 @@ export default function AdjustmentGrid({ propertyId, prepared, disabled, onSaved
     {/* One card per comparable. */}
     <ul className="space-y-1.5">{rows.map(r => {
       const excluded = r.id in setup.exclusions; const lines = setup.lines.map((l, i) => [l, i] as const).filter(([l]) => l.comparable_id === r.id);
-      return <li key={r.id} className={`rounded border ${excluded ? "border-slate-200 bg-slate-50 opacity-80" : "border-slate-200"}`}>
+      return <li key={r.id} className={`rounded-xl ${excluded ? "bg-black/[0.03] opacity-70" : "ring-1 ring-black/[0.06]"}`}>
         <button type="button" className="w-full text-left px-2 py-1.5" aria-expanded={open === r.id} onClick={() => { setOpen(open === r.id ? null : r.id); onSelectEvidence(r.id); }}>
           <div className="flex items-center gap-2"><span className="font-medium truncate flex-1" dir="auto">{r.title || r.id}</span>
             <span className="whitespace-nowrap">{n0.format(r.raw_sar_sqm)} → <strong>{n0.format(r.adjusted_sar_sqm)}</strong></span></div>

@@ -85,7 +85,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     const p = live.current; group.clearLayers();
     const items = p.records.filter(r => r.coordinates).map(r => { const px = m.project(r.coordinates!, m.getZoom()); return { record: r, coordinates: r.coordinates as LatLng, x: px.x, y: px.y }; });
     for (const cluster of clusterProjected<MapRecord>(items)) {
-      const el = evidenceMarker(cluster, p.selectedId, p.groupIds);
+      const el = evidenceMarker(cluster, p.selectedId, p.groupIds, m.getZoom() >= 15);
       L.marker(cluster.center, { icon: icon(el), keyboard: false }).addTo(group);
       L.DomEvent.disableClickPropagation(el);
       el.addEventListener("click", () => {
@@ -130,17 +130,25 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     const m = map.current; const group = layers.current.subject; if (!m || !group) return;
     const p = live.current; group.clearLayers(); if (!p.subject) return;
     const el = subjectMarker(p.subject, p.subjectDraggable);
-    const marker = L.marker(p.subject.coordinates, { icon: icon(el, 40), draggable: p.subjectDraggable, keyboard: false, zIndexOffset: 1000 }).addTo(group);
+    const marker = L.marker(p.subject.coordinates, { icon: L.divIcon({ className: "mizan-leaflet-icon", html: el, iconSize: [34, 44], iconAnchor: [17, 43] }), draggable: p.subjectDraggable, keyboard: false, zIndexOffset: 1000 }).addTo(group);
     L.DomEvent.disableClickPropagation(el);
     marker.on("dragend", () => { const q = marker.getLatLng(); live.current.onSubjectMove([q.lat, q.lng]); });
     if (p.subjectDraggable) el.addEventListener("keydown", e => { const d = arrowDelta(e); if (!d) return; e.preventDefault();
       const px = m.latLngToContainerPoint(p.subject!.coordinates).add(L.point(d[0], d[1])); const q = m.containerPointToLatLng(px);
       live.current.onSubjectMove([q.lat, q.lng]); requestAnimationFrame(() => (container.current?.querySelector(".mizan-subject") as HTMLElement | null)?.focus()); });
   }
+  // Frame inside the part of the map not covered by the card (side card on desktop, bottom sheet on phones).
+  function visibleInsets() {
+    const size = map.current!.getSize();
+    return size.x < 768 ? { tl: L.point(40, 56), br: L.point(40, Math.round(size.y * 0.55)) } : { tl: L.point(Math.min(420, size.x * 0.6), 64), br: L.point(72, 48) };
+  }
   function fit(points: LatLng[], maxZoom = 17) {
     const m = map.current; if (!m || !points.length) return;
-    if (points.length === 1) m.setView(points[0], Math.max(m.getZoom(), Math.min(maxZoom, 17)));
-    else m.fitBounds(L.latLngBounds(points), { padding: [64, 64], maxZoom });
+    const { tl, br } = visibleInsets();
+    if (points.length > 1) { m.fitBounds(L.latLngBounds(points), { paddingTopLeft: tl, paddingBottomRight: br, maxZoom }); return; }
+    const zoom = Math.max(m.getZoom(), Math.min(maxZoom, 17));
+    const shift = tl.subtract(br).divideBy(2);
+    m.setView(m.unproject(m.project(points[0], zoom).subtract(shift), zoom), zoom);
   }
 
   useEffect(() => { drawTiles(); }, [props.basemap]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -28,7 +28,7 @@ If present, `handoff/CLAUDE_LOCAL_HANDOFF.md` records this Mac's exact paths and
 
 ## Priorities
 
-The map-first workspace exists with free Esri imagery (see `handoff/CONTINUATION_LOG.md`); live satellite imagery still needs the owner's free ArcGIS Location Platform key. The owner requires free services and a simple, Apple-like interface: keep the single-card design and avoid paid providers. Evidence must be visible before analysis and remain accessible while selecting location → property type → method → sourced required inputs → calculation → saved results.
+The map-first workspace exists with free Esri imagery (see `handoff/CONTINUATION_LOG.md`); live satellite imagery still needs the owner's free ArcGIS Location Platform key, pasted in the map style panel. The owner requires free services and a simple, Apple-like interface: keep the single-card design and avoid paid providers. Evidence must be visible before analysis and remain accessible while selecting location → property type → method → sourced required inputs → calculation → saved results.
 
 Then progress through professional comparables and reconciliation, development/HBU/maximum bid, financing/returns/scenarios, intelligence and professional outputs. Use the full scope and continuation guide for acceptance criteria. Do not add empty navigation or label unfinished modules as complete.
 
@@ -56,7 +56,7 @@ npm --prefix Projects/Muqayyim-Downloads/frontend run test
 npm --prefix Projects/Muqayyim-Downloads/frontend run build
 ```
 
-Last verified local baseline (comparable adjustment grid, 28 October 2026): 104 backend tests, 17 frontend tests and a production build (Apple-style redesign + Esri free imagery). Recheck after source changes; this is a baseline, not a permanent required test count. Browser checks use disposable APIs and clearly synthetic fixtures; mocked tiles do not verify live imagery.
+Last verified local baseline (comparable adjustment grid, 28 October 2026): 104 backend tests, 18 frontend tests and a production build (31 October 2026: UI polish and in-app Esri key). Recheck after source changes; this is a baseline, not a permanent required test count. Browser checks use disposable APIs and clearly synthetic fixtures; mocked tiles do not verify live imagery.
 
 ## Execution and handoff
 

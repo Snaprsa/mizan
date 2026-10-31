@@ -14,6 +14,7 @@ import { applyEvidenceFilters, evidenceSummaries, facetValues, LAYER, LAYERS, ri
 import { BASEMAPS, defaultState, loadState, saveState, type Basemap, type Camera, type Subject, type WorkspaceState } from "@/lib/map-workspace-state";
 import { readProviderConfig } from "@/lib/map-provider";
 import MapSearch from "@/components/map/map-search";
+import MapStylePanel from "@/components/map/map-style-panel";
 import { CoveragePanel, EvidenceTable, money, precisionLabel } from "@/components/map/evidence-panels";
 import type { Draft, MapBounds, MapStatus, MapTool, RendererHandle } from "@/components/map/types";
 import { Dot, Glass, PrimaryButton, Row, Section, Segmented, SheetHeader, Switch } from "@/components/ui/sheet-ui";
@@ -23,8 +24,10 @@ const MapRenderer = dynamic(() => import("@/components/map/map-renderer"), { ssr
 const LIMIT = 5000;
 const inBounds = (p: LatLng | null, b: MapBounds | null) => !!p && !!b && p[0] >= b.south && p[0] <= b.north && (b.west <= b.east ? p[1] >= b.west && p[1] <= b.east : p[1] >= b.west || p[1] <= b.east);
 const n0 = new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 });
+// Unicode isolate: stops an Arabic district from flipping a neighbouring date (2027-02-04 shown as 04-02-2027).
+const isolate = (s: string | null | undefined) => `\u2068${s ?? ""}\u2069`;
 const label = (s: string) => s.replaceAll("_", " ").replace(/^./, c => c.toUpperCase());
-const NAV = [{ href: "/dashboard", label: "Cases & dashboard" }, { href: "/properties", label: "Properties" }, { href: "/data", label: "Market data" }, { href: "/cases/new", label: "New case" }];
+const NAV = [{ href: "/dashboard", label: "Cases" }, { href: "/properties", label: "Properties" }, { href: "/data", label: "Market data" }, { href: "/cases/new", label: "New case" }];
 type Sheet = "peek" | "half" | "full";
 
 function MapWorkspace() {
@@ -34,7 +37,9 @@ function MapWorkspace() {
   const update = useCallback((patch: Partial<WorkspaceState> | ((s: WorkspaceState) => Partial<WorkspaceState>)) =>
     setWs(s => ({ ...s, ...(typeof patch === "function" ? patch(s) : patch) })), []);
   const hadSavedCamera = useRef(false);
-  useEffect(() => { const s = loadState(typeof window === "undefined" ? undefined : window.localStorage); hadSavedCamera.current = !!s.camera; setWs(s); setHydrated(true); }, []);
+  useEffect(() => { const s = loadState(typeof window === "undefined" ? undefined : window.localStorage); hadSavedCamera.current = !!s.camera;
+    // Always open somewhere sensible: the valuation in the URL, otherwise Explore.
+    setWs({ ...s, panels: { ...s.panels, tab: new URLSearchParams(window.location.search).get("analysis") ? "valuation" : "evidence" } }); setHydrated(true); }, []);
   useEffect(() => { if (hydrated) saveState(window.localStorage, ws); }, [ws, hydrated]);
 
   const [methods, setMethods] = useState<ValuationMethod[]>([]); const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
@@ -49,7 +54,8 @@ function MapWorkspace() {
   const [sheet, setSheet] = useState<Sheet>("half"); const [place, setPlace] = useState<LatLng | null>(null); const [listSize, setListSize] = useState(30);
   const handle = useRef<RendererHandle | null>(null); const root = useRef<HTMLDivElement>(null);
   const today = useMemo(riyadhToday, []);
-  const hasEsriKey = useMemo(() => !!readProviderConfig().esriKey, []);
+  const [esriKey, setEsriKey] = useState<string | null>(null);
+  useEffect(() => { setEsriKey(readProviderConfig().esriKey); }, []);
 
   useEffect(() => { getValuationCatalog().then(c => { setMethods(c.methods); setPropertyTypes(c.property_types); }).catch(e => setError(e.message)); }, []);
   useEffect(() => { const set = () => setNarrow(window.innerWidth < 768); set(); window.addEventListener("resize", set); return () => window.removeEventListener("resize", set); }, []);
@@ -208,6 +214,11 @@ function MapWorkspace() {
   const method = methods.find(m => m.key === ws.approach);
   const activeFilters = [f.city, f.type, f.from || f.to, ...f.statuses, ...f.sources, ...f.precisions, f.minReliability].filter(Boolean).length + LAYERS.filter(l => ws.layers[l.key] === false).length;
 
+  // Auto-generated names look like "Land · 24.77200, 46.64100": show the coordinates as the subtitle.
+  const analysisName = prepared?.property_name || ws.subject?.label || "Valuation";
+  const nameMatch = analysisName.match(/^(.*) · (-?\d+\.\d+, -?\d+\.\d+)$/);
+  const analysisTitle = nameMatch ? { title: nameMatch[1], place: nameMatch[2] } : { title: analysisName, place: "" };
+
   // ── Card content ──────────────────────────────────────────────────────────
   const explore = <>
     <SheetHeader title={group.length ? "Cluster" : "Explore"} subtitle={loading ? "Updating…" : `${listed.length} record${listed.length === 1 ? "" : "s"}${f.withinView ? " in view" : ""}${data?.truncated ? ` · first ${data.returned} of ${data.total}` : ""}`}
@@ -226,7 +237,7 @@ function MapWorkspace() {
     {ws.filterToArea && ws.searchArea && <div className="px-4 pt-2 text-[13px] text-black/55">Limited to your search area · <button type="button" className="text-[#007AFF]" onClick={() => update({ filterToArea: false })}>Show all</button></div>}
     <Section title="Evidence" footer={listed.length > listSize ? <button type="button" className="text-[#007AFF]" onClick={() => setListSize(n => n + 30)}>Show more</button> : "Saved Mizan records — asking prices are never counted as sales."}>
       {listed.slice(0, listSize).map(r => <Row key={r.id} onClick={() => selectRecord(r)} leading={<Dot color={LAYER[r.kind].color} />} label={r.title}
-        detail={[LAYER[r.kind].short, r.district || r.city, r.date ? (r.date > today ? `${r.date} (future)` : r.date) : "undated"].filter(Boolean).join(" · ")}
+        detail={[LAYER[r.kind].short, r.district || r.city, r.date ? (r.date > today ? `${r.date} (future)` : r.date) : "undated"].filter(Boolean).map(isolate).join(" · ")}
         value={r.kind === "market" ? `${String(r.value)}` : r.price_per_sqm != null ? `${n0.format(r.price_per_sqm)}/m²` : r.coordinates ? "" : "No location"} />)}
       {!listed.length && !loading && <div className="px-4 py-6 text-center text-[14px] text-black/45">{f.withinView ? "Nothing in this part of the map." : "No records match your filters."}</div>}
     </Section>
@@ -281,13 +292,13 @@ function MapWorkspace() {
   </>;
 
   const analysis = <>
-    <SheetHeader onBack={() => { analysisUrl(null); setPrepared(null); go("evidence"); }} backLabel="Done" title={prepared?.property_name || ws.subject?.label || "Valuation"}
-      subtitle={prepared ? `${label(prepared.property_type || "")} · ${prepared.method_label}` : "Loading…"} />
+    <SheetHeader onBack={() => { analysisUrl(null); setPrepared(null); go("evidence"); }} backLabel="Done" title={analysisTitle.title}
+      subtitle={prepared ? [analysisTitle.place, prepared.method_label].filter(Boolean).join(" · ") : "Loading…"} />
     {ws.siteOutline && <Section title="Site outline" footer="Drawn by you on the map. Approximate — not a certified cadastral boundary.">
       <Row label="Approximate area" value={formatArea(geodesicAreaSqm(ws.siteOutline))} />
       <Row onClick={saveOutline} label={<span className="text-[#007AFF]">{savingOutline ? "Saving…" : "Save outline to property"}</span>} />
     </Section>}
-    <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} embedded /></div>
+    <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} /></div>
   </>;
 
   const filters = <>
@@ -327,7 +338,7 @@ function MapWorkspace() {
   const sheetHeight = narrow ? (sheet === "peek" ? "h-[200px]" : sheet === "half" ? "h-[52vh]" : "h-[88vh]") : "";
 
   return <div ref={root} className="mizan-apple relative h-full w-full overflow-hidden bg-[#e8e6e1]">
-    {hydrated && <MapRenderer handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} basemap={ws.basemap} initialCamera={ws.camera}
+    {hydrated && <MapRenderer key={esriKey || "standard"} handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} basemap={ws.basemap} initialCamera={ws.camera}
       subject={ws.subject} subjectDraggable={!analysisId && !!ws.subject && !ws.subject.confirmed} searchArea={evidenceRing} editArea={editArea && !!ws.searchArea}
       siteOutline={ws.siteOutline} placeMarker={place} tool={tool} draft={draft ?? (measure ? { tool: "measure", points: measure } : null)}
       onCamera={onCamera} onSelect={select} onGroup={setGroup} onMapClick={onMapClick} onSubjectMove={onSubjectMove} onAreaEdit={onAreaEdit} onStatus={onStatus} />}
@@ -342,7 +353,7 @@ function MapWorkspace() {
             <p className="px-3 py-1.5 text-[13px] font-semibold text-black/80">Mizan <span lang="ar" className="font-normal text-black/40">ميزان</span></p>
             {NAV.map(n => <Link key={n.href} href={n.href} className="block rounded-lg px-3 py-2 text-[15px] text-black/80 hover:bg-black/[0.05]">{n.label}</Link>)}</Glass>}
         </div>
-        <div className="flex-1 min-w-0"><MapSearch records={all} geocodingAvailable={!!caps?.geocoding} hasKey={hasEsriKey} onCoordinates={onCoordinates} onRecord={r => { setPlace(null); selectRecord(r); }} onPlace={onPlace} /></div>
+        <div className="flex-1 min-w-0"><MapSearch records={all} geocodingAvailable={!!caps?.geocoding} hasKey={!!esriKey} onCoordinates={onCoordinates} onRecord={r => { setPlace(null); selectRecord(r); }} onPlace={onPlace} /></div>
       </div>
       {caseId && <p className="mx-4 mt-2 rounded-lg bg-[#007AFF]/10 px-3 py-1.5 text-[12.5px] text-[#0059c9]">Showing one case. <Link href="/map" className="underline">Show everything</Link></p>}
       {error && <p role="alert" className="mx-4 mt-2 rounded-lg bg-[#FF3B30]/10 px-3 py-1.5 text-[13px] text-[#c4271d]">{error}</p>}
@@ -350,16 +361,11 @@ function MapWorkspace() {
     </Glass>
 
     {/* Map style + provider status (top right). */}
-    <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2">
+    <div className="absolute right-3 top-3 z-[1001] flex flex-col items-end gap-2">
       <Glass className="rounded-full"><button type="button" aria-label="Map style" aria-expanded={popover === "style"} onClick={() => setPopover(p => p === "style" ? "" : "style")} className="grid h-11 w-11 place-items-center text-black/75"><MapIcon size={19} /></button></Glass>
-      {popover === "style" && <Glass className="w-[300px] rounded-2xl p-3">
-        <div className="grid grid-cols-2 gap-2">{BASEMAPS.map(b => { const ok = !!caps?.[b.key];
-          return <button key={b.key} type="button" disabled={!ok} aria-pressed={ws.basemap === b.key && ok} onClick={() => { update({ basemap: b.key }); setPopover(""); }}
-            className={`rounded-xl p-2.5 text-left ring-1 ${ws.basemap === b.key && ok ? "ring-2 ring-[#007AFF] bg-[#007AFF]/5" : "ring-black/10 bg-white"} disabled:opacity-40`}>
-            <span className={`block h-12 rounded-lg ${b.key === "satellite" ? "bg-[linear-gradient(135deg,#3f5d3a,#8a7b5a_45%,#5b6b4e)]" : b.key === "hybrid" ? "bg-[linear-gradient(135deg,#3f5d3a,#8a7b5a_45%,#5b6b4e)] [box-shadow:inset_0_0_0_2px_rgba(255,255,255,.5)]" : b.key === "terrain" ? "bg-[linear-gradient(135deg,#dfe6cf,#c9d6b3_50%,#e9e1cc)]" : "bg-[linear-gradient(135deg,#f4f1ea,#e4e0d6)]"}`} />
-            <span className="mt-1.5 block text-[13px] font-medium text-black/80">{b.key === "roadmap" ? "Standard" : b.label}</span></button>; })}</div>
-        <p className="mt-3 text-[12px] leading-snug text-black/50">{status?.provider === "esri" ? status.imageryNote || "Esri imagery (free tier)." : <>Satellite imagery is free with an Esri ArcGIS Location Platform account — no card needed. Add the key as <code className="text-[11px]">NEXT_PUBLIC_ARCGIS_API_KEY</code> and rebuild. {status?.message && status.message !== "No free Esri key configured" ? `(${status.message})` : ""}</>}</p>
-      </Glass>}
+      {popover === "style" && <Glass className="max-h-[calc(100vh-90px)] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl p-3.5">
+        <MapStylePanel basemap={ws.basemap} status={status} onChoose={b => { update({ basemap: b }); setPopover(""); }}
+          onKeyChange={k => { setEsriKey(k); if (k) { update({ basemap: "hybrid" }); setPopover(""); setNotice("Satellite is on."); } }} /></Glass>}
       {status?.state === "error" && <Glass className="max-w-[260px] rounded-2xl px-3 py-2 text-[12.5px] text-[#c4271d]">{status.message}</Glass>}
     </div>
 
@@ -390,7 +396,7 @@ function MapWorkspace() {
 
     {/* Quiet status pill when there is no satellite imagery. */}
     {status?.provider === "osm" && !narrow && <button type="button" onClick={() => setPopover("style")} className="absolute left-[calc(50%+196px)] top-3 z-[999] -translate-x-1/2">
-      <Glass className="flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] text-black/60"><Layers size={14} />Standard map · satellite needs a free Esri key</Glass></button>}
+      <Glass className="flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] text-black/60"><Layers size={14} />Standard map · <span className="text-[#007AFF]">Turn on satellite</span></Glass></button>}
 
     {/* Drawing bar and toasts (bottom centre). */}
     {(draft || measure || tool === "place_subject") && <div className={`absolute left-1/2 z-[1001] -translate-x-1/2 ${narrow ? "top-3" : "bottom-8"}`} role="status" aria-live="polite">

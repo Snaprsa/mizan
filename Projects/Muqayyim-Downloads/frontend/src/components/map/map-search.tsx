@@ -55,7 +55,7 @@ export default function MapSearch({ records, geocodingAvailable, hasKey, onCoord
       {places?.map((p, i) => <Result key={i} onClick={() => { onPlace(p.coordinates); done(); }} title={p.label} detail={`${p.precision.replace(/([a-z])([A-Z])/g, "$1 $2")} · moves the map — then tap to drop the pin`} />)}
       {busy && <p className="px-4 py-3 text-[13px] text-black/45">Searching…</p>}
       {error && <p className="px-4 py-3 text-[13px] text-[#c4271d]">{error}</p>}
-      {!busy && empty && !error && <p className="px-4 py-3 text-[13px] text-black/45">{coords ? "" : !hasKey ? "Address search needs the free Esri key. Type coordinates like 24.7136, 46.6753." : term.length < 3 ? "Keep typing…" : "No matches."}</p>}
+      {!busy && empty && !error && <p className="px-4 py-3 text-[13px] text-black/45">{coords ? "" : !hasKey ? "Turn on satellite to search addresses. For now, type coordinates like 24.7136, 46.6753." : term.length < 3 ? "Keep typing…" : "No matches."}</p>}
       {plotLike && <p className="border-t border-black/[0.06] px-4 py-2.5 text-[12px] text-black/45">Plot and plan numbers can’t be looked up yet — no authorised cadastral source is connected.</p>}
     </div>}
   </div>;

@@ -122,3 +122,18 @@ test('Esri provider: tile URL shape and geocode x/y become [latitude, longitude]
     await assert.rejects(esriGeocode('Olaya', 'bad'), /not enabled for this Esri key/);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('Esri key: a build-time key wins, a browser key works without a rebuild, placeholders are ignored', async () => {
+  const { readProviderConfig, ESRI_KEY_STORAGE } = await import('../src/lib/map-provider.ts');
+  const store = value => ({ getItem: k => (k === ESRI_KEY_STORAGE ? value : null) });
+  const before = process.env.NEXT_PUBLIC_ARCGIS_API_KEY;
+  try {
+    delete process.env.NEXT_PUBLIC_ARCGIS_API_KEY;
+    assert.deepEqual([readProviderConfig(store(null)).esriKey, readProviderConfig(store(null)).keySource], [null, null]);
+    assert.equal(readProviderConfig(store('YOUR_KEY')).esriKey, null);
+    assert.deepEqual([readProviderConfig(store(' browser ')).esriKey, readProviderConfig(store('browser')).keySource], ['browser', 'browser']);
+    assert.equal(readProviderConfig({ getItem() { throw new Error('blocked'); } }).esriKey, null, 'blocked storage is not fatal');
+    process.env.NEXT_PUBLIC_ARCGIS_API_KEY = 'built';
+    assert.deepEqual([readProviderConfig(store('browser')).esriKey, readProviderConfig(store('browser')).keySource], ['built', 'build']);
+  } finally { if (before === undefined) delete process.env.NEXT_PUBLIC_ARCGIS_API_KEY; else process.env.NEXT_PUBLIC_ARCGIS_API_KEY = before; }
+});

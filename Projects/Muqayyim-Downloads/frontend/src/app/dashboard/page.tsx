@@ -27,21 +27,21 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Valuation Cases</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage your real estate valuation projects</p>
+          <h1 className="text-[28px] font-semibold tracking-tight">Cases</h1>
+          <p className="mt-0.5 text-[14px] text-black/50">{cases.length} {cases.length === 1 ? "case" : "cases"}</p>
         </div>
         <Link
           href="/cases/new"
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] transition-colors shadow-sm"
         >
           <Plus size={15} />
-          New Case
+          New case
         </Link>
       </div>
 
       {/* Stats */}
       {!loading && cases.length > 0 && (
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <StatCard icon={<FolderOpen size={18} />}  label="Total Cases"   value={cases.length}  color="blue" />
           <StatCard icon={<TrendingUp size={18} />}   label="Active"        value={activeCases}   color="green" />
           <StatCard icon={<Layers size={18} />}       label="Sources"       value={totalSources}  color="purple" />
@@ -63,7 +63,7 @@ export default function DashboardPage() {
       )}
 
       {!loading && cases.length === 0 && (
-        <div className="text-center py-24 bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="text-center py-24 bg-white rounded-2xl ring-1 ring-black/[0.05]">
           <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-4">
             <FolderOpen size={22} className="text-slate-400" />
           </div>
@@ -71,7 +71,7 @@ export default function DashboardPage() {
           <p className="text-slate-400 text-sm mb-5">Create your first valuation case to get started</p>
           <Link
             href="/cases/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] transition-colors"
           >
             <Plus size={14} /> Create Case
           </Link>
@@ -79,7 +79,7 @@ export default function DashboardPage() {
       )}
 
       {cases.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl ring-1 ring-black/[0.05] overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
@@ -95,7 +95,7 @@ export default function DashboardPage() {
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors cursor-pointer group">
                   <td className="px-5 py-3.5">
                     <Link href={`/cases/${c.id}`} className="block">
-                      <div className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">{c.title}</div>
+                      <div className="font-medium text-slate-900 group-hover:text-[#007AFF] transition-colors">{c.title}</div>
                       {c.description && (
                         <div className="text-xs text-slate-400 mt-0.5 truncate max-w-sm">{c.description}</div>
                       )}
@@ -132,7 +132,7 @@ function StatCard({
   color: "blue" | "green" | "purple" | "orange";
 }) {
   const colors = {
-    blue:   "bg-blue-50 text-blue-600",
+    blue:   "bg-blue-50 text-[#007AFF]",
     green:  "bg-green-50 text-green-600",
     purple: "bg-purple-50 text-purple-600",
     orange: "bg-orange-50 text-orange-600",
@@ -151,7 +151,7 @@ function StatCard({
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     draft:       "bg-slate-100 text-slate-500",
-    in_progress: "bg-blue-50 text-blue-700 border border-blue-200",
+    in_progress: "bg-blue-50 text-[#007AFF] border border-blue-200",
     review:      "bg-amber-50 text-amber-700 border border-amber-200",
     completed:   "bg-green-50 text-green-700 border border-green-200",
     archived:    "bg-slate-100 text-slate-400",
