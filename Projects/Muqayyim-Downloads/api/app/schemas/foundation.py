@@ -106,6 +106,10 @@ class Building(StrictModel):
     condition: str | None = None
     occupancy_ratio: float | None = Field(None, ge=0, le=1)
     current_use: str | None = None
+    floor_number: int | None = Field(None, ge=-5, le=200)  # The unit's floor; `floors` is the building's count.
+    unit_position: Literal['rear', 'side', 'front', 'corner'] | None = None
+    grade: Literal['C', 'B', 'A', 'A+'] | None = None
+    grade_basis: Literal['assumed', 'observed'] | None = None  # A hypothetical grade stays labelled as assumed.
 
 
 class Financial(StrictModel):
@@ -127,7 +131,7 @@ class Provenance(StrictModel):
 
 AdjustmentFactor = Literal['conditions_of_sale', 'financing', 'market_conditions', 'location', 'size', 'frontage',
                            'street_width', 'corner', 'shape', 'condition', 'age', 'quality', 'occupancy',
-                           'development_potential', 'zoning', 'other']
+                           'development_potential', 'zoning', 'floor', 'position', 'grade', 'other']
 
 
 class AdjustmentLine(StrictModel):
@@ -155,8 +159,26 @@ class TimeAdjustment(StrictModel):
     status: Literal['proposed', 'approved'] = 'proposed'
 
 
+class AdjustmentRule(StrictModel):
+    """One reviewer-set rate applied to every comparable from the subject-vs-comparable difference."""
+    factor: Literal['size', 'floor', 'position', 'grade', 'street_width', 'corner']
+    percent: float = Field(ge=-0.5, le=0.5)  # Fraction per unit of difference; 0.01 = 1%.
+    source: str = Field(min_length=3, max_length=500)
+    status: Literal['proposed', 'approved'] = 'proposed'
+
+
+class ComparableAttributes(StrictModel):
+    """Reviewed structured details of a comparable. Unknown stays None and is never adjusted for."""
+    floor: int | None = Field(None, ge=-5, le=200)
+    position: Literal['rear', 'side', 'front', 'corner'] | None = None
+    grade: Literal['C', 'B', 'A', 'A+'] | None = None
+    street_width_m: float | None = Field(None, ge=0)
+    corner: bool | None = None
+
+
 class AdjustmentSetup(StrictModel):
     lines: list[AdjustmentLine] = Field(default_factory=list, max_length=500)
+    rules: list[AdjustmentRule] = Field(default_factory=list, max_length=20)
     time: TimeAdjustment | None = None
     weighting: Literal['equal', 'inverse_gross_adjustment', 'manual'] = 'equal'
     manual_weights: dict[str, float] = Field(default_factory=dict)

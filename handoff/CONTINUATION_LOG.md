@@ -1,5 +1,25 @@
 # Continuation log
 
+## 2026-10-31 — Simple, accurate comparable adjustment by property type
+
+### Completed behaviour
+- Property details by type (`building.floor_number`, `unit_position`, `grade`, `grade_basis`; existing land street width and corner). The Valuation card shows only the relevant ones: apartment floor/position, office assumed grade/floor, land street width/corner. Grades are recorded as assumed unless marked observed.
+- Comparables gain optional `attributes` (additive migration `20261031_comparable_attributes`), edited per sale via `PUT /api/v1/evidence/{id}/attributes` (audited).
+- `AdjustmentRule`: one reviewer-set rate per factor (size, floor, position, grade, street width, corner) applied to every comparable as subject minus comparable. Unknown values get no adjustment and a note. An approved manual line for the same factor overrides the rule for that sale. Mizan suggests no rates. Calculation version `mizan.map-workflow.4`.
+- Freshness now includes subject details and comparable attributes.
+- Demo data: `POST`/`DELETE /api/v1/evidence/demo` and a paste box under Explore → Data. Records are always titled `DEMO · `, flagged `is_demo`, reliability 1, in a demo case; rejected if outside Riyadh, dated in the future or malformed. Valuations using them show a warning and a limitation. The owner imports them; nothing is seeded automatically. Prompt: `handoff/DEMO_DATA_PROMPT.md`.
+
+### Tests (31 Oct 2026)
+- Backend 116 passed (+4). Frontend 18 passed. Lint, type-check, build pass.
+- Migration rehearsed on a backup copy of the runtime DB: counts unchanged, integrity ok.
+- Browser (synthetic data, disposable API :8100): floor rule and arithmetic, per-sale edit, freshness label, demo paste with code fence, bad JSON, swapped coordinates, removal.
+- Office grade rule covered by unit tests, not walked through in the browser.
+
+### Remaining
+- Position and grade use a fixed order (rear→side→front→corner, C→B→A→A+); per-step rates are a simplification.
+- Rates are reviewer judgements, not market-derived. Rental comparables and cross-method reconciliation are next.
+
+
 ## 2026-10-31 — Live satellite imagery with a protected key
 
 ### Completed behaviour

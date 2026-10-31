@@ -117,3 +117,74 @@ async def test_saved_adjustments_drive_the_run_and_survive_input_saves(client):
     assert run['outputs']['evidence']['applied_adjustments'] == 1
     revisions = (await client.get(f"/api/v1/properties/{p['property_id']}/revisions")).json()
     assert any('Comparable adjustments' in (r.get('reason') or '') for r in revisions)
+
+
+def test_rules_adjust_from_subject_and_comparable_differences():
+    comp = lambda i, **a: {'id': i, 'title': i, 'price_per_sqm': 1000, 'area_sqm': 100, 'date': '2026-10-01', 'attributes': a}
+    rows = [comp('low', floor=2, grade='B'), comp('same', floor=5, grade='A'), comp('unknown')]
+    setup = {'rules': [{'factor': 'floor', 'percent': 0.01, 'source': 'Reviewer', 'status': 'approved'},
+                       {'factor': 'grade', 'percent': 0.10, 'source': 'Reviewer', 'status': 'approved'},
+                       {'factor': 'size', 'percent': 0.05, 'source': 'Draft', 'status': 'proposed'}]}
+    g = analyse(rows, setup, 200, '2026-10-28', {'floor': 5, 'grade': 'A'})
+    by = {r['id']: r for r in g['rows']}
+    # Subject is 3 floors higher and one grade better than "low": additive +3% and +10%.
+    assert by['low']['adjusted_sar_sqm'] == pytest.approx(1130)
+    assert by['same']['adjusted_sar_sqm'] == 1000 and not by['same']['steps']
+    # Unknown values are never adjusted for, and the note says why.
+    assert by['unknown']['adjusted_sar_sqm'] == 1000
+    assert any('No floor adjustment' in n for n in by['unknown']['notes'])
+    assert all(s['factor'] != 'size' for r in g['rows'] for s in r['steps']), 'a proposed rule is not applied'
+
+
+def test_rule_direction_size_and_manual_override():
+    comps = [{'id': f'c{i}', 'price_per_sqm': 1000, 'area_sqm': 100, 'date': '2026-10-01', 'attributes': {'floor': 8}} for i in range(3)]
+    setup = {'rules': [{'factor': 'floor', 'percent': 0.01, 'source': 'R', 'status': 'approved'}, {'factor': 'size', 'percent': -0.02, 'source': 'R', 'status': 'approved'}],
+             'lines': [line('c0', 'floor', 'percent', 0.05)]}
+    rows = {r['id']: r for r in analyse(comps, setup, 300, '2026-10-28', {'floor': 5})['rows']}
+    # Subject 3 floors lower (-3%) and 200 m² larger at -2% per 100 m² (-4%).
+    assert rows['c1']['adjusted_sar_sqm'] == pytest.approx(930)
+    # An approved manual floor line replaces the floor rule for that comparable only.
+    assert rows['c0']['adjusted_sar_sqm'] == pytest.approx(1010)
+    assert sum(s['factor'] == 'floor' for s in rows['c0']['steps']) == 1
+
+
+@pytest.mark.asyncio
+async def test_demo_import_is_labelled_validated_and_removable(client):
+    good = {'title': 'Olaya flat', 'property_type': 'apartment', 'evidence_type': 'transaction_achieved', 'price_sar': 900000, 'area_sqm': 150,
+            'date': '2026-09-01', 'latitude': 24.7, 'longitude': 46.68, 'district': 'Al Olaya', 'attributes': {'floor': 4, 'position': 'front'}}
+    forged = {**good, 'title': 'Forged', 'attributes': {'is_demo': False}}
+    r = await client.post('/api/v1/evidence/demo', json={'records': [good, good, {**good, 'title': 'Jeddah', 'latitude': 21.5, 'longitude': 39.2},
+        {**good, 'title': 'Swapped', 'latitude': 46.68, 'longitude': 24.7}, {**good, 'title': 'Future', 'date': '2099-01-01'}, forged]})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert (body['inserted'], body['duplicates'], body['rejected_count']) == (1, 1, 4)
+    assert any('outside Riyadh' in x['reason'] for x in body['rejected'])
+    data = (await client.get('/api/v1/map/records')).json()
+    assert data['coverage']['demo_comparables'] == 1
+    rec = data['data'][0]
+    assert rec['title'].startswith('DEMO · ') and rec['attributes']['is_demo'] is True and rec['reliability_score'] == 1
+    assert rec['kind'] == 'transaction' and rec['coordinates'] == [24.7, 46.68] and rec['price_per_sqm'] == 6000
+    # Editing details cannot remove the demo label.
+    saved = await client.put(f"/api/v1/evidence/{rec['entity_id']}/attributes", json={'reason': 'Reviewed floor', 'attributes': {'floor': 7}})
+    assert saved.status_code == 200 and saved.json()['attributes']['is_demo'] is True and saved.json()['attributes']['floor'] == 7
+    assert (await client.delete('/api/v1/evidence/demo')).json()['removed'] == 1
+    assert (await client.get('/api/v1/map/records')).json()['total'] == 0
+
+
+@pytest.mark.asyncio
+async def test_subject_details_drive_rules_and_demo_is_flagged_in_the_result(client):
+    p = await start(client, 'sales_comparison'); path = '/api/v1/analysis/' + p['property_id']
+    prop = (await client.get('/api/v1/properties/' + p['property_id'])).json()
+    body = {**prop['property'], 'property_type': 'apartment', 'building': {**prop['property']['building'], 'floor_number': 6}}
+    updated = await client.put('/api/v1/properties/' + p['property_id'], json={'property': body, 'expected_revision': prop['revision'], 'reason': 'Unit details'})
+    assert updated.status_code == 200, updated.text
+    recs = [{'title': f'Sale {i}', 'property_type': 'apartment', 'evidence_type': 'transaction_achieved', 'price_sar': 500000, 'area_sqm': 100,
+             'date': '2026-10-01', 'latitude': 24.7 + i * 0.001, 'longitude': 46.7, 'attributes': {'floor': 2}} for i in range(3)]
+    assert (await client.post('/api/v1/evidence/demo', json={'records': recs})).json()['inserted'] == 3
+    p = (await client.put(path + '/inputs', json=payload(updated.json(), {'area_sqm': 100}, 'sales_comparison'))).json()
+    assert p['comparison_factors'] == ['size', 'floor', 'position'] and p['subject_attributes']['floor'] == 6
+    p = (await client.put(path + '/adjustments', json={'expected_revision': p['revision'], 'reason': 'Floor premium', 'adjustments': {
+        'rules': [{'factor': 'floor', 'percent': 0.01, 'source': 'Reviewer judgement', 'status': 'approved'}]}})).json()
+    run = (await client.post(path + '/runs', json={'expected_revision': p['revision']})).json()
+    assert run['outputs']['value'] == pytest.approx(5000 * 1.04 * 100)
+    assert any('synthetic demo' in l for l in run['outputs']['limitations']) and run['outputs']['evidence']['demo_comparables'] == 3

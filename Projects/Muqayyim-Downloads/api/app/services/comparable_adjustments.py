@@ -14,8 +14,11 @@ from statistics import mean, median, pstdev
 import math
 
 TRANSACTIONAL = ['conditions_of_sale', 'financing', 'market_conditions']
-PROPERTY = ['location', 'size', 'frontage', 'street_width', 'corner', 'shape', 'condition', 'age',
-            'quality', 'occupancy', 'development_potential', 'zoning', 'other']
+PROPERTY = ['location', 'size', 'floor', 'position', 'grade', 'frontage', 'street_width', 'corner', 'shape', 'condition',
+            'age', 'quality', 'occupancy', 'development_potential', 'zoning', 'other']
+ORDERS = {'position': ['rear', 'side', 'front', 'corner'], 'grade': ['C', 'B', 'A', 'A+']}
+RULE_LABELS = {'size': ('size', 'per 100 m²'), 'floor': ('floor', 'per floor'), 'position': ('position in the building', 'per step'),
+               'grade': ('grade', 'per grade'), 'street_width': ('street width', 'per metre'), 'corner': ('corner', 'if it differs')}
 FACTORS = TRANSACTIONAL + PROPERTY
 HEAVY_GROSS = 0.25   # gross adjustment above 25% is flagged as heavily adjusted
 INVERSE_FLOOR = 0.05  # inverse-gross weights use 1 / (gross + 5%) so unadjusted sales do not dominate infinitely
@@ -56,6 +59,44 @@ def statistics(values, weights=None):
         out['weighted_mean'] = sum(v * w for v, w in zip(values, weights)) / total
         out['weighted_median'] = weighted_median(values, weights)
     return out
+
+
+def rule_difference(factor, subject, comp, subject_area):
+    """Subject minus comparable in the rule's units. None means a value is unknown: no adjustment is made."""
+    attributes = comp.get('attributes') or {}
+    if factor == 'size':
+        area = comp.get('area_sqm')
+        return (subject_area - area) / 100 if subject_area and area else None
+    if factor == 'floor':
+        a, b = subject.get('floor'), attributes.get('floor')
+        return a - b if a is not None and b is not None else None
+    if factor in ORDERS:
+        a, b = subject.get(factor), attributes.get(factor)
+        order = ORDERS[factor]
+        return order.index(a) - order.index(b) if a in order and b in order else None
+    if factor == 'street_width':
+        a, b = subject.get('street_width_m'), attributes.get('street_width_m')
+        return a - b if a is not None and b is not None else None
+    if factor == 'corner':
+        a, b = subject.get('corner'), attributes.get('corner')
+        return int(a) - int(b) if a is not None and b is not None else None
+    return None
+
+
+def rule_lines(comp, rules, manual, subject, subject_area):
+    """Per-comparable lines from the approved rules. An approved manual line for the same factor overrides the rule."""
+    lines, notes = [], []
+    for rule in rules or []:
+        if rule.get('status') != 'approved' or rule['factor'] in manual:
+            continue
+        name, unit = RULE_LABELS[rule['factor']]
+        difference = rule_difference(rule['factor'], subject or {}, comp, subject_area)
+        if difference is None:
+            notes.append(f"No {name} adjustment: the value is not recorded for this sale or the subject.")
+        elif difference:
+            lines.append({'comparable_id': comp['id'], 'factor': rule['factor'], 'basis': 'percent', 'amount': rule['percent'] * difference,
+                'rationale': f"{rule['percent']:+.1%} {unit} × {difference:g}", 'source': rule['source'], 'status': 'approved', 'derived': True})
+    return lines, notes
 
 
 def adjust_comparable(comp, lines, time_rule, as_of):
@@ -110,13 +151,13 @@ def adjust_comparable(comp, lines, time_rule, as_of):
         notes.append('Adjusted unit value is zero or negative; review the adjustments.')
     if gross is not None and gross > HEAVY_GROSS:
         notes.append(f'Heavily adjusted: gross adjustment {gross:.0%} exceeds {HEAVY_GROSS:.0%}.')
-    return {'id': comp['id'], 'title': comp.get('title'), 'date': comp.get('date'), 'area_sqm': area,
+    return {'id': comp['id'], 'title': comp.get('title'), 'date': comp.get('date'), 'area_sqm': area, 'attributes': comp.get('attributes') or {},
             'distance_km': comp.get('distance_km'), 'raw_sar_sqm': raw, 'transaction_adjusted_sar_sqm': transaction_adjusted,
             'adjusted_sar_sqm': adjusted, 'gross_adjustment': gross, 'net_adjustment': net,
             'steps': steps, 'pending': pending, 'notes': notes}
 
 
-def analyse(eligible, setup, subject_area, as_of):
+def analyse(eligible, setup, subject_area, as_of, subject=None):
     """Adjust eligible comparables and reconcile them to one unit value. Raises ValueError on invalid setups."""
     setup = setup or {}
     # Callers outside the API may pass comparables without IDs; use stable positional IDs.
@@ -127,7 +168,10 @@ def analyse(eligible, setup, subject_area, as_of):
     orphaned = [l for l in lines if l['comparable_id'] not in ids]
     rows, excluded = [], []
     for comp in eligible:
-        trail = adjust_comparable(comp, [l for l in lines if l['comparable_id'] == comp['id']], setup.get('time'), as_of)
+        own = [l for l in lines if l['comparable_id'] == comp['id']]
+        derived, rule_notes = rule_lines(comp, setup.get('rules'), {l['factor'] for l in own if l['status'] == 'approved'}, subject, subject_area)
+        trail = adjust_comparable(comp, own + derived, setup.get('time'), as_of)
+        trail['notes'] = rule_notes + trail['notes']
         if comp['id'] in exclusions:
             excluded.append({**trail, 'exclusion_reason': exclusions[comp['id']]})
         else:
@@ -174,11 +218,13 @@ def analyse(eligible, setup, subject_area, as_of):
                       'high': adjusted_stats['p75'] * subject_area,
                       'basis': 'Low/high are the interquartile adjusted unit values × subject area; not a confidence interval.'}
     pending = sum(len(r['pending']) for r in rows + excluded)
-    return {'rows': rows, 'excluded': excluded, 'orphaned_lines': orphaned, 'pending_count': pending,
+    demo_count = sum(1 for r in rows if r['attributes'].get('is_demo'))
+    return {'rows': rows, 'excluded': excluded, 'orphaned_lines': orphaned, 'pending_count': pending, 'demo_count': demo_count,
             'raw': raw_stats, 'adjusted': adjusted_stats, 'weighting': weighting, 'conclusion_basis': basis,
             'concluded_sar_sqm': concluded, 'indication': indication, 'gaps': gaps,
             'conventions': ['Unit values are SAR per m² of each comparable\'s recorded area.',
                             'Transactional adjustments compound in order: conditions of sale → financing → market conditions (time).',
                             'Property adjustments are additive on the transaction-adjusted unit value.',
                             'Only approved adjustments are applied; proposed lines are listed but ignored.',
+                            'Rules use subject minus comparable. Unknown values get no adjustment; a manual line for the same factor overrides the rule.',
                             'Outlier flags are informational; exclusions require a reviewer reason.']}

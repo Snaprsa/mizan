@@ -109,7 +109,7 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
             'evidence_type': evidence, 'status': c.status, 'price': price, 'currency': c.currency or 'SAR',
             'area_sqm': area, 'price_per_sqm': price / area if price is not None and area and area > 0 else None,
             'source': url or filename or 'Manual / unspecified source', 'source_id': str(c.source_id),
-            'reliability_score': c.reliability_score, 'case_id': str(c.case_id),
+            'attributes': c.attributes or {}, 'reliability_score': c.reliability_score, 'case_id': str(c.case_id),
             'href': '/cases/'+str(c.case_id)})
     props = (await db.scalars(select(Property).where(Property.created_by == owner_id(user))
                               .order_by(Property.updated_at.desc()))).all()
@@ -153,6 +153,7 @@ async def map_records(q: str = Query('', max_length=255), city: str | None = Non
     datasets = await local_datasets(user=user)
     coverage = {'properties': len(props), 'comparables': len(comps), 'market_observations': len(observations),
                 'unverified_datasets': len(datasets), 'datasets': datasets,
+                'demo_comparables': sum(1 for c, _, _ in comps if (c.attributes or {}).get('is_demo')),
                 'missing_location': sum(r['coordinates'] is None for r in records)}
     def matches(r):
         if city and r['city'] != city: return False

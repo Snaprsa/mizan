@@ -50,6 +50,10 @@ for key, label in [('investment_method', 'Term & reversion / investment method')
                    ('ground_rent', 'Ground rent / leasehold interests'), ('avm', 'AVM / hedonic pricing')]:
     METHODS[key] = {'label': label, 'implemented': False, 'description': 'Not yet connected to the map workflow.', 'fields': []}
 
+# What can differ between the subject and a comparable, per property type. Rates are always the reviewer's.
+COMPARISON_FACTORS = {'apartment': ['size', 'floor', 'position'], 'office': ['size', 'grade', 'floor'],
+                      'land': ['size', 'street_width', 'corner']}
+DEFAULT_COMPARISON_FACTORS = ['size']
 PROPERTY_TYPES = ['land', 'apartment', 'villa', 'residential_building', 'office', 'retail', 'warehouse',
                   'logistics', 'industrial', 'hotel', 'mixed_use', 'special_purpose']
 

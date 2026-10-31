@@ -56,7 +56,7 @@ npm --prefix Projects/Muqayyim-Downloads/frontend run test
 npm --prefix Projects/Muqayyim-Downloads/frontend run build
 ```
 
-Last verified local baseline (comparable adjustment grid, 28 October 2026): 112 backend tests, 17 frontend tests and a production build (31 October 2026: protected Esri imagery). Recheck after source changes; this is a baseline, not a permanent required test count. Browser checks use disposable APIs and clearly synthetic fixtures; mocked tiles do not verify live imagery.
+Last verified local baseline (comparable adjustment grid, 28 October 2026): 116 backend tests, 18 frontend tests and a production build (31 October 2026: per-factor comparable rules and demo import). Recheck after source changes; this is a baseline, not a permanent required test count. Browser checks use disposable APIs and clearly synthetic fixtures; mocked tiles do not verify live imagery.
 
 ## Execution and handoff
 

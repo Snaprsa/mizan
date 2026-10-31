@@ -128,13 +128,13 @@ async def run(property_id: uuid.UUID, body: RunAnalysis,
     values = {f['key']: f['value'] for f in prepared['fields']}
     try:
         outputs = calculate(prepared['method'], values, prepared['eligible_comparables'],
-                            adjustments=prepared.get('adjustment_setup'), as_of=prepared['as_of'])
+                            adjustments=prepared.get('adjustment_setup'), as_of=prepared['as_of'], subject=prepared.get('subject_attributes'))
     except (ValueError, OverflowError) as exc:
         raise HTTPException(422, str(exc)) from exc
     snapshot = {'schema_version': 'mizan.valuation-run.v1', 'property_id': str(p.id), 'property_revision': p.revision,
         'property': p.data, 'assumptions': stored, 'method': prepared['method'], 'data_date': prepared['as_of'],
         'inputs': prepared['fields'], 'comparables': prepared['eligible_comparables'],
-        'adjustment_setup': prepared.get('adjustment_setup'),
+        'adjustment_setup': prepared.get('adjustment_setup'), 'subject_attributes': prepared.get('subject_attributes'),
         'calculation_version': outputs['calculation_version'], 'model_version': None, 'outputs': outputs}
     result = ValuationRun(case_id=p.case_id, subject_id=p.id, status='completed', data=snapshot)
     if p.case_id is None:

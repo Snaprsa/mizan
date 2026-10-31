@@ -46,3 +46,12 @@ test('changed reviewed adjustments make a saved sales result stale', () => {
   assert.equal(savedRunMatchesPrepared(p, { ...run(), adjustment_setup: changed }), false);
   assert.equal(savedRunMatchesPrepared(p, run()), false, 'a run saved before adjustments is not current');
 });
+
+test('changed subject or comparable details make a saved sales result stale', () => {
+  const subject = { floor: 6, grade: null };
+  const base = { ...prepared(), subject_attributes: subject };
+  assert.equal(savedRunMatchesPrepared(base, { ...run(), subject_attributes: subject }), true);
+  assert.equal(savedRunMatchesPrepared(base, { ...run(), subject_attributes: { floor: 2, grade: null } }), false);
+  const edited = { ...base, eligible_comparables: base.eligible_comparables.map((c, i) => i ? c : { ...c, attributes: { floor: 9 } }) };
+  assert.equal(savedRunMatchesPrepared(edited, { ...run(), subject_attributes: subject }), false);
+});

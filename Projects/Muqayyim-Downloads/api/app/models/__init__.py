@@ -204,6 +204,7 @@ class Comparable(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     notes = Column(Text, nullable=True)
+    attributes = Column(JSON, nullable=True)  # Reviewed structured details: floor, position, grade, ...
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

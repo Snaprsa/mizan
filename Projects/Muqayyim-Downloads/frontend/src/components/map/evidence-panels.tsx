@@ -2,7 +2,7 @@
 // Inspector panels: selected record, evidence summaries/list, data coverage and the linked table.
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { MapRecord, MapResponse } from "@/lib/api";
+import { importDemoComparables, removeDemoComparables, type MapRecord, type MapResponse } from "@/lib/api";
 import { formatDistance, haversineMeters, type LatLng } from "@/lib/geo";
 import { activityCounts, evidenceSummaries, LAYER, MIN_SUMMARY_SAMPLE, riyadhToday, sourceLabel, type Summary } from "@/lib/map-evidence";
 
@@ -93,7 +93,34 @@ export function EvidenceList({ records, selectedId, onSelect, subject, groupActi
   </div>;
 }
 
-export function CoveragePanel({ data, unlocated, onSelect }: { data: MapResponse | null; unlocated: MapRecord[]; onSelect: (r: MapRecord) => void }) {
+function DemoData({ count, onChanged }: { count: number; onChanged: () => void }) {
+  const [text, setText] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const [result, setResult] = useState<Awaited<ReturnType<typeof importDemoComparables>> | null>(null);
+  async function run() {
+    setBusy(true); setError(""); setResult(null);
+    try {
+      let parsed: unknown;
+      try { parsed = JSON.parse(text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "")); }
+      catch { throw new Error("That isn’t valid JSON. Paste only the list ChatGPT produced."); }
+      const records = Array.isArray(parsed) ? parsed : (parsed as { records?: unknown[] })?.records;
+      if (!Array.isArray(records) || !records.length) throw new Error("Expected a JSON list of comparables.");
+      if (records.length > 500) throw new Error("Please import 500 records or fewer at a time.");
+      setResult(await importDemoComparables(records)); setText(""); onChanged();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  async function clear() { setBusy(true); setError(""); setResult(null); try { await removeDemoComparables(); onChanged(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
+  return <section><h3 className="font-semibold text-slate-700 mb-1">Demo comparables ({count})</h3>
+    <p className="text-slate-500 mb-2">Paste a JSON list for testing. Every record is labelled DEMO, and valuations using them say so.</p>
+    <textarea aria-label="Demo comparables JSON" rows={4} value={text} onChange={e => { setText(e.target.value); setError(""); }} placeholder="[ { &quot;title&quot;: …" className="mizan-field font-mono !text-[12px]" />
+    <div className="mt-2 flex items-center gap-3"><button type="button" className="mizan-button !py-1.5 !text-[13px]" disabled={busy || !text.trim()} onClick={run}>{busy ? "Working…" : "Import"}</button>
+      {count > 0 && <button type="button" className="text-[13px] text-[#FF3B30] disabled:opacity-40" disabled={busy} onClick={clear}>Remove all demo data</button>}</div>
+    {error && <p role="alert" className="mt-2 text-[12.5px] text-[#c4271d]">{error}</p>}
+    {result && <div role="status" className="mt-2 text-[12.5px] text-black/65"><p>{result.inserted} imported{result.duplicates ? ` · ${result.duplicates} already there` : ""}{result.rejected_count ? ` · ${result.rejected_count} rejected` : ""}</p>
+      {result.rejected.slice(0, 5).map(r => <p key={r.index} className="text-[#c4271d]">{r.title || `Record ${r.index + 1}`}: {r.reason}</p>)}</div>}
+  </section>;
+}
+
+export function CoveragePanel({ data, unlocated, onSelect, onDemoChanged }: { data: MapResponse | null; unlocated: MapRecord[]; onSelect: (r: MapRecord) => void; onDemoChanged: () => void }) {
   const [q, setQ] = useState("");
   const queue = unlocated.filter(r => !q || [r.title, r.city, r.district, r.source].some(v => v?.toLowerCase().includes(q.toLowerCase())));
   const c = data?.coverage;
@@ -101,6 +128,7 @@ export function CoveragePanel({ data, unlocated, onSelect }: { data: MapResponse
     <section><h3 className="font-semibold text-slate-700 mb-1">All saved data</h3>
       <p>{c?.properties ?? 0} properties · {c?.comparables ?? 0} comparables · {c?.market_observations ?? 0} market observations</p>
       <p className="text-slate-500 mt-1">Exact or source-reported locations become pins. Area-level observations and records without coordinates stay listed here; district centres are never shown as property locations.</p></section>
+    <DemoData count={c?.demo_comparables ?? 0} onChanged={onDemoChanged} />
     <section><h3 className="font-semibold text-slate-700 mb-1">Location-resolution queue ({unlocated.length})</h3>
       <input className="mizan-compact-input mb-2" type="search" placeholder="Search unlocated records" aria-label="Search unlocated records" value={q} onChange={e => setQ(e.target.value)} />
       <ul className="max-h-64 overflow-auto divide-y divide-slate-100 border border-slate-200 rounded">{queue.map(r => <li key={r.id}>

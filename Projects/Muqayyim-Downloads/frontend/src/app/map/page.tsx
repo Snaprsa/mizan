@@ -219,7 +219,7 @@ function MapWorkspace() {
 
   // ── Card content ──────────────────────────────────────────────────────────
   const explore = <>
-    <SheetHeader title={group.length ? "Cluster" : "Explore"} subtitle={loading ? "Updating…" : `${listed.length} record${listed.length === 1 ? "" : "s"}${f.withinView ? " in view" : ""}${data?.truncated ? ` · first ${data.returned} of ${data.total}` : ""}`}
+    <SheetHeader title={group.length ? "Cluster" : "Explore"} subtitle={loading ? "Updating…" : `${data?.coverage?.demo_comparables ? "Includes demo data · " : ""}${listed.length} record${listed.length === 1 ? "" : "s"}${f.withinView ? " in view" : ""}${data?.truncated ? ` · first ${data.returned} of ${data.total}` : ""}`}
       trailing={<button type="button" onClick={() => setFiltersOpen(true)} className="relative mt-1 grid h-9 w-9 place-items-center rounded-full bg-black/[0.05] text-black/70 active:bg-black/10" aria-label="Filters">
         <SlidersHorizontal size={17} />{activeFilters > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#007AFF] px-1 text-[10px] font-semibold text-white">{activeFilters}</span>}</button>} />
     <div className="px-4 pb-2"><PrimaryButton onClick={beginValuation}>Value a property</PrimaryButton></div>
@@ -239,9 +239,9 @@ function MapWorkspace() {
         value={r.kind === "market" ? `${String(r.value)}` : r.price_per_sqm != null ? `${n0.format(r.price_per_sqm)}/m²` : r.coordinates ? "" : "No location"} />)}
       {!listed.length && !loading && <div className="px-4 py-6 text-center text-[14px] text-black/45">{f.withinView ? "Nothing in this part of the map." : "No records match your filters."}</div>}
     </Section>
-    {(unlocated.length > 0 || (data?.coverage?.unverified_datasets ?? 0) > 0) && <Section>
-      <Row onClick={() => go("coverage")} chevron label="Data to review" detail={`${unlocated.length} without a location · ${data?.coverage?.unverified_datasets ?? 0} files not imported`} />
-    </Section>}
+    <Section>
+      <Row onClick={() => go("coverage")} chevron label="Data" detail={[`${unlocated.length} without a location`, `${data?.coverage?.unverified_datasets ?? 0} files not imported`, ...(data?.coverage?.demo_comparables ? [`${data.coverage.demo_comparables} demo`] : [])].join(" · ")} />
+    </Section>
   </>;
 
   const record = selected && <>
@@ -328,8 +328,8 @@ function MapWorkspace() {
   </>;
 
   const coverage = <>
-    <SheetHeader onBack={() => go("evidence")} backLabel="Explore" title="Data to review" subtitle="Records without a location stay off the map — nothing is guessed." />
-    <CoveragePanel data={data} unlocated={unlocated} onSelect={r => { go("evidence"); selectRecord(r); }} />
+    <SheetHeader onBack={() => go("evidence")} backLabel="Explore" title="Data" subtitle="Records without a location stay off the map. Nothing is guessed." />
+    <CoveragePanel data={data} unlocated={unlocated} onSelect={r => { go("evidence"); selectRecord(r); }} onDemoChanged={() => setReload(n => n + 1)} />
   </>;
 
   const content = view === "coverage" ? coverage : view === "filters" ? filters : view === "analysis" ? analysis : view === "flow" ? flow : view === "record" ? record : explore;

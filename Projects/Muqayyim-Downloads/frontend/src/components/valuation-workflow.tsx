@@ -2,10 +2,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { PreparedAnalysis, ValuationMethod, AnalysisInput, AnalysisResult, prepareAnalysis, saveAnalysisInputs, calculateAnalysis, getAnalysisRuns } from "@/lib/api";
+import { ComparableAttributes, PreparedAnalysis, RuleFactor, SubjectAttributes, ValuationMethod, AnalysisInput, AnalysisResult, getProperty, saveProperty, prepareAnalysis, saveAnalysisInputs, calculateAnalysis, getAnalysisRuns } from "@/lib/api";
 
 import SensitivityTable from "./sensitivity-table";
-import AdjustmentGrid from "./adjustment-grid";
+import AdjustmentGrid, { AttributeInput } from "./adjustment-grid";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
@@ -38,7 +38,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
   const values = useMemo(() => Object.fromEntries(Object.entries(draft).filter(([, d]) => d.value !== "").map(([key, d]) => [key, { value: Number(d.value), source: d.source, as_of: d.as_of,
       status: prepared?.fields.find(f => f.key === key && f.value === Number(d.value) && f.source === d.source && f.as_of === d.as_of)?.assumption_status || "user_input" }])) as Record<string, AnalysisInput>, [draft, prepared]);
   const signature = useMemo(() => valuationSignature({ method, asOf, radius: Number(radius),
-    lookback: Number(lookback), inputs: values, evidence: prepared?.eligible_comparables || [], adjustments: prepared?.adjustment_setup }),
+    lookback: Number(lookback), inputs: values, evidence: prepared?.eligible_comparables || [], adjustments: prepared?.adjustment_setup, subject: prepared?.subject_attributes }),
     [method, asOf, radius, lookback, values, prepared]);
   const complete = !!prepared && prepared.fields.every(f => {
     const d = draft[f.key]; const value = Number(d?.value);
@@ -101,11 +101,15 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
         <p className={`mt-0.5 text-[32px] font-semibold leading-tight tracking-tight ${resultCurrent ? "text-black/90" : "text-black/35"}`}>{money(result.outputs.value)}</p>
         {range && <p className="mt-1 text-[13px] text-black/55">Middle half of sales: {money(range.low)} – {money(range.high)}</p>}
         <p className="mt-1 text-[12px] text-black/40">{methods.find(m => m.key === result.method)?.label || result.method} · as of {result.data_date}</p>
+        {!!grid?.demo_count && <p className="mt-2 rounded-lg bg-[#FF9F0A]/10 px-2.5 py-1.5 text-[12.5px] text-[#8a5300]">Uses {grid.demo_count} made-up demo {grid.demo_count === 1 ? "sale" : "sales"}. Not a real market value.</p>}
       </> : <><p className="text-[15px] font-semibold text-black/85">{busy ? "Calculating…" : prepared.ready ? (automatic ? "Almost there" : "Ready to calculate") : "A few things are needed"}</p>
         <p className="mt-0.5 text-[13px] text-black/50">{prepared.ready ? "Your value will appear here." : "Complete the items below and your value will appear here."}</p></>}
     </section>
     {error && <div className="mizan-error" role="alert">{error}<button type="button" className="underline block mt-2" onClick={() => { setError(""); prepareAnalysis(propertyId, method).then(hydrate).catch(e => setError(e.message)); }}>Reload saved inputs</button></div>}
     {!!prepared.gaps.length && <section className="rounded-2xl bg-[#FF9F0A]/10 px-4 py-3 text-[13px] text-[#8a5300]"><h3 className="font-semibold">Still needed</h3><ul className="mt-1 list-disc space-y-0.5 pl-4">{prepared.gaps.map(g => <li key={g}>{g}</li>)}</ul></section>}
+
+    {/* The few details that matter for this type of property. */}
+    {method === "sales_comparison" && <SubjectDetails key={JSON.stringify(prepared.subject_attributes)} propertyId={propertyId} factors={prepared.comparison_factors || []} attributes={prepared.subject_attributes || {}} propertyType={prepared.property_type} onSaved={refresh} />}
 
     {/* What this approach needs from you. */}
     {!!prepared.fields.length && <section className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/[0.05]" aria-label="Approach-specific required inputs">
@@ -136,7 +140,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
     {/* Everything else is one tap away. */}
     <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.05]">
       {method === "sales_comparison" && grid && <Disclosure title="Adjust comparables" detail={applied ? `${applied} applied` : `${grid.rows.length} sales`}>
-        <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} /></Disclosure>}
+        <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} /></Disclosure>}
       <Disclosure title="Evidence used" detail={method === "sales_comparison" ? `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable` : `${prepared.candidates.length} nearby`} defaultOpen={method === "sales_comparison" && !grid}>
         <p className="text-[12.5px] text-black/50">Within {prepared.radius_km} km. Listings and draft, undated or repeated records are not used as achieved sales.</p>
         <div className="mt-2 max-h-56 divide-y divide-black/[0.05] overflow-auto">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block w-full py-1.5 text-left" onClick={() => onSelectEvidence(c.id)}><span className="block truncate text-[14px] text-black/80" dir="auto">{c.title}</span><span className={`block text-[12px] ${c.eligible ? "text-[#248a3d]" : "text-black/45"}`}>{c.distance_km} km · {c.eligible ? "Used" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="py-2 text-[13px] text-black/45">No located evidence within this radius.</p>}</div>
@@ -163,6 +167,31 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
       </Disclosure>
     </div>
   </div>;
+}
+
+function SubjectDetails({ propertyId, factors, attributes, propertyType, onSaved }: { propertyId: string; factors: RuleFactor[]; attributes: SubjectAttributes; propertyType: string; onSaved: () => void }) {
+  const editable = factors.filter(f => f !== "size");
+  const [draft, setDraft] = useState<SubjectAttributes>(attributes); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  if (!editable.length) return null;
+  const labels: Partial<Record<RuleFactor, string>> = { floor: "Floor", position: "Position in building", grade: draft.grade_basis === "observed" ? "Grade" : "Assumed grade", street_width: "Street width (m)", corner: "Corner plot" };
+  const changed = JSON.stringify(draft) !== JSON.stringify(attributes);
+  async function save() {
+    setBusy(true); setError("");
+    try {
+      const p = await getProperty(propertyId);
+      const building = { ...p.property.building, floor_number: draft.floor ?? null, unit_position: draft.position ?? null, grade: draft.grade ?? null, grade_basis: draft.grade ? draft.grade_basis || "assumed" : null };
+      const land = { ...p.property.land, street_width_m: draft.street_width_m ?? null, corner: draft.corner ?? null };
+      await saveProperty(propertyId, { ...p.property, building, land }, p.revision, "Property details for comparison");
+      onSaved();
+    } catch (e) { setError((e as Error).message); setBusy(false); }
+  }
+  return <section className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.05]" aria-label="About this property">
+    <h3 className="text-[15px] font-semibold text-black/85">About this {propertyType.replaceAll("_", " ")}</h3>
+    <div className="mt-2 space-y-2">{editable.map(f => <div key={f} className="flex items-center justify-between gap-2 text-[14px] text-black/70"><span>{labels[f]}</span><AttributeInput factor={f} value={draft as ComparableAttributes} onChange={p => setDraft(d => ({ ...d, ...p }))} /></div>)}</div>
+    {factors.includes("grade") && draft.grade && <p className="mt-2 text-[11.5px] text-black/45">Recorded as an assumed grade, not a certified one.</p>}
+    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[14px] font-medium text-[#007AFF] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
+    {error && <p role="alert" className="mt-1 text-[12.5px] text-[#c4271d]">{error}</p>}
+  </section>;
 }
 
 function Disclosure({ title, detail, defaultOpen, children }: { title: string; detail?: string; defaultOpen?: boolean; children: ReactNode }) {

@@ -4,15 +4,15 @@ import math
 from api.app.services.legacy_valuation import engines
 from api.app.services.comparable_adjustments import analyse
 
-VERSION = 'mizan.map-workflow.3'  # .3: reviewed comparable adjustment grid for sales comparison
+VERSION = 'mizan.map-workflow.4'  # .4: per-factor adjustment rules from subject and comparable attributes
 
 
-def calculate(method, v, eligible, *, include_sensitivity=True, adjustments=None, as_of=None):
+def calculate(method, v, eligible, *, include_sensitivity=True, adjustments=None, as_of=None, subject=None):
     Income, Cost, legacy_hash = engines()
     result = {'method': method, 'currency': 'SAR', 'confidence': None, 'calculation_version': VERSION,
               'legacy_engine_hash': legacy_hash, 'limitations': []}
     if method == 'sales_comparison':
-        grid = analyse(eligible, adjustments, v['area_sqm'], str(as_of) if as_of else None)
+        grid = analyse(eligible, adjustments, v['area_sqm'], str(as_of) if as_of else None, subject)
         if grid['gaps']:
             raise ValueError('; '.join(grid['gaps']))
         rate = grid['concluded_sar_sqm']
@@ -23,13 +23,14 @@ def calculate(method, v, eligible, *, include_sensitivity=True, adjustments=None
                       'comparable_count': len(grid['rows']), 'excluded_count': len(grid['excluded']), 'area_sqm': v['area_sqm'],
                       'observed_unit_price_min': min(rates), 'observed_unit_price_max': max(rates),
                       'raw_statistics': grid['raw'], 'adjusted_statistics': grid['adjusted'], 'indication': grid['indication'],
-                      'applied_adjustments': applied, 'pending_adjustments': grid['pending_count'],
+                      'applied_adjustments': applied, 'pending_adjustments': grid['pending_count'], 'demo_comparables': grid['demo_count'],
                       'grid': grid['rows'], 'excluded': grid['excluded'], 'conventions': grid['conventions'],
                       **({'median_sar_sqm': rate} if grid['conclusion_basis'] == 'median' and not applied else {})},
             limitations=(['Unadjusted comparable indication; differences in area basis, condition, time and location still need professional review.']
                          if not applied else ['Adjustments are reviewer judgements recorded with rationales; they are not market-derived unless their source says so.'])
                         + ['The interquartile range of adjusted unit values is not a confidence interval.']
-                        + ([f"{grid['pending_count']} proposed adjustment(s) were not approved and were not applied."] if grid['pending_count'] else []))
+                        + ([f"{grid['pending_count']} proposed adjustment(s) were not approved and were not applied."] if grid['pending_count'] else [])
+                        + ([f"Uses {grid['demo_count']} synthetic demo comparable(s). This is not a real market indication."] if grid['demo_count'] else []))
     elif method == 'income_capitalization':
         effective = v['annual_rent']*(1-v['vacancy'])+v['other_income']
         noi = effective-v['operating_expenses']

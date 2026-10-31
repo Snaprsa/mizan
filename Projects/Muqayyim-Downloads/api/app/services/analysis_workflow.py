@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from api.app.models.foundation import MarketObservation, DataSource
 from api.app.services.foundation import assumptions, owner_id
-from api.app.services.valuation_catalog import METHODS
+from api.app.services.valuation_catalog import COMPARISON_FACTORS, DEFAULT_COMPARISON_FACTORS, METHODS
 from api.app.routers.map import map_records
 from api.app.services.valuation_calculations import VERSION
 from api.app.services.comparable_adjustments import analyse
@@ -55,6 +55,13 @@ def path_value(data, path):
     for part in path.split('.'):
         result = result.get(part) if isinstance(result, dict) else None
     return numeric(result)
+
+
+def subject_attributes(p):
+    """The subject's comparison details. Unknown stays None; nothing is inferred."""
+    building, land = p.data.get('building') or {}, p.data.get('land') or {}
+    return {'floor': building.get('floor_number'), 'position': building.get('unit_position'), 'grade': building.get('grade'),
+            'grade_basis': building.get('grade_basis'), 'street_width_m': land.get('street_width_m'), 'corner': land.get('corner')}
 
 
 async def prepare(db, p, user, method=None):
@@ -148,7 +155,7 @@ async def prepare(db, p, user, method=None):
     adjustment_analysis = None
     if key == 'sales_comparison' and len(eligible) >= 3:
         try:
-            adjustment_analysis = analyse(eligible, adjustment_setup, values.get('area_sqm'), as_of)
+            adjustment_analysis = analyse(eligible, adjustment_setup, values.get('area_sqm'), as_of, subject_attributes(p))
             gaps.extend(adjustment_analysis['gaps'])
         except ValueError as exc:
             gaps.append(f'Comparable adjustments: {exc}')
@@ -167,5 +174,6 @@ async def prepare(db, p, user, method=None):
         'candidates': candidates, 'eligible_comparables': eligible, 'gaps': gaps, 'ready': not gaps,
         'coverage': evidence.get('coverage'),
         'adjustment_setup': adjustment_setup, 'adjustment_analysis': adjustment_analysis,
+        'subject_attributes': subject_attributes(p), 'comparison_factors': COMPARISON_FACTORS.get(p.property_type, DEFAULT_COMPARISON_FACTORS),
         'calculation_version': VERSION,
         'calculation_status': 'ready' if not gaps else 'needs_inputs'}
