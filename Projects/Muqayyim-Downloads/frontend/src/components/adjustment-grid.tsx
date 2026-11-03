@@ -191,8 +191,8 @@ function ComparableDetails({ entityId, factors, attributes, onSaved }: { entityI
   }
   return <div className="rounded-lg bg-black/[0.03] p-2"><p className="mb-1 text-[12px] font-medium text-black/60">This sale’s details</p>
     <div className="space-y-1.5">{editable.map(f => <div key={f} className="flex items-center justify-between gap-2 text-[13px] text-black/70"><span>{RULES[f].label}</span><AttributeInput factor={f} value={draft} onChange={p => setDraft(d => ({ ...d, ...p }))} /></div>)}</div>
-    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[13px] font-medium text-[#007AFF] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
-    {error && <p role="alert" className="mt-1 text-[12px] text-[#c4271d]">{error}</p>}
+    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[13px] font-medium text-[#0071E3] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
+    {error && <p role="alert" className="mt-1 text-[12px] text-[#C0271B]">{error}</p>}
   </div>;
 }
 

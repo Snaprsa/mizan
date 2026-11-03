@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { importDemoComparables, removeDemoComparables, type MapRecord, type MapResponse } from "@/lib/api";
 import { formatDistance, haversineMeters, type LatLng } from "@/lib/geo";
+import EvidenceKey from "./evidence-key";
 import { activityCounts, evidenceSummaries, LAYER, MIN_SUMMARY_SAMPLE, riyadhToday, sourceLabel, type Summary } from "@/lib/map-evidence";
 
 const n0 = new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 });
@@ -19,12 +20,12 @@ const priceLabel = (r: MapRecord) => r.kind === "transaction" ? "Achieved price"
 export function SelectedRecord({ record, subject, onClear, onUseAsSubject, compact = false, onExpand }: { record: MapRecord; subject: LatLng | null; onClear: () => void; onUseAsSubject: (r: MapRecord) => void; compact?: boolean; onExpand?: () => void }) {
   const layer = LAYER[record.kind];
   if (compact) return <div className="flex items-center gap-2 border-b border-slate-200 bg-blue-50/40 px-4 py-1.5 text-xs" aria-label="Selected record">
-    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: layer.color }} /><span className="font-medium truncate" dir="auto">{record.title}</span>
+    <EvidenceKey kind={record.kind} /><span className="font-medium truncate" dir="auto">{record.title}</span>
     <span className="text-slate-500 whitespace-nowrap">{record.price_per_sqm == null ? money(record.price, record.currency) : `${n0.format(record.price_per_sqm)} /m²`}</span>
     {onExpand && <button type="button" className="ml-auto text-blue-700 underline whitespace-nowrap" onClick={onExpand}>Details</button>}
     <button type="button" className="text-slate-400 hover:text-slate-700 px-1" aria-label="Clear selected record" onClick={onClear}>×</button></div>;
   return <section className="border-b border-slate-200 bg-blue-50/40 px-4 py-3" aria-label="Selected record">
-    <div className="flex items-start gap-2"><span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: layer.color }} />
+    <div className="flex items-start gap-2"><EvidenceKey kind={record.kind} />
       <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold break-words" dir="auto">{record.title}</h3>
         <p className="text-[11px] text-slate-500">{layer.label} · {record.status}</p></div>
       <button type="button" className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1" aria-label="Clear selected record" onClick={onClear}>×</button></div>
@@ -80,7 +81,7 @@ export function EvidenceList({ records, selectedId, onSelect, subject, groupActi
     <ul className="space-y-0.5" aria-label="Evidence records">{records.slice(page * size, (page + 1) * size).map(r => <li key={r.id}>
       <button type="button" data-record-id={r.id} aria-pressed={selectedId === r.id} onClick={() => onSelect(r)}
         className={`w-full text-left rounded px-2 py-1.5 border ${selectedId === r.id ? "border-blue-400 bg-blue-50" : "border-transparent hover:bg-slate-50"}`}>
-        <div className="flex items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: LAYER[r.kind].color }} />
+        <div className="flex items-center gap-2"><EvidenceKey kind={r.kind} />
           <span className="text-[13px] font-medium truncate flex-1" dir="auto">{r.title}</span>
           <span className="text-[11px] text-slate-600 whitespace-nowrap">{r.kind === "market" ? `${String(r.value)} ${r.unit || ""}` : r.price_per_sqm != null ? `${n0.format(r.price_per_sqm)} /m²` : money(r.price, r.currency)}</span></div>
         <div className="flex gap-2 pl-4 text-[11px] text-slate-500"><span className="truncate">{[LAYER[r.kind].short, r.district || r.city, r.property_type].filter(Boolean).join(" · ")}</span>
@@ -114,9 +115,9 @@ function DemoData({ count, onChanged }: { count: number; onChanged: () => void }
     <textarea aria-label="Demo comparables JSON" rows={4} value={text} onChange={e => { setText(e.target.value); setError(""); }} placeholder="[ { &quot;title&quot;: …" className="mizan-field font-mono !text-[12px]" />
     <div className="mt-2 flex items-center gap-3"><button type="button" className="mizan-button !py-1.5 !text-[13px]" disabled={busy || !text.trim()} onClick={run}>{busy ? "Working…" : "Import"}</button>
       {count > 0 && <button type="button" className="text-[13px] text-[#FF3B30] disabled:opacity-40" disabled={busy} onClick={clear}>Remove all demo data</button>}</div>
-    {error && <p role="alert" className="mt-2 text-[12.5px] text-[#c4271d]">{error}</p>}
+    {error && <p role="alert" className="mt-2 text-[12.5px] text-[#C0271B]">{error}</p>}
     {result && <div role="status" className="mt-2 text-[12.5px] text-black/65"><p>{result.inserted} imported{result.duplicates ? ` · ${result.duplicates} already there` : ""}{result.rejected_count ? ` · ${result.rejected_count} rejected` : ""}</p>
-      {result.rejected.slice(0, 5).map(r => <p key={r.index} className="text-[#c4271d]">{r.title || `Record ${r.index + 1}`}: {r.reason}</p>)}</div>}
+      {result.rejected.slice(0, 5).map(r => <p key={r.index} className="text-[#C0271B]">{r.title || `Record ${r.index + 1}`}: {r.reason}</p>)}</div>}
   </section>;
 }
 
@@ -156,7 +157,7 @@ export function EvidenceTable({ records, selectedId, onSelect, subject }: { reco
   return <div className="h-full overflow-auto"><table className="mizan-table text-xs [&_td]:py-1 [&_th]:py-1.5 [&_th]:sticky [&_th]:top-0 [&_th]:bg-white">
     <thead><tr><th>Type</th>{head("title", "Record")}{head("date", "Date")}<th>Price</th>{head("price_per_sqm", "Unit value")}<th>Area</th>{head("distance", "Distance")}<th>Location</th><th>Source</th><th>Status</th></tr></thead>
     <tbody>{rows.map(r => <tr key={r.id} onClick={() => onSelect(r)} aria-selected={selectedId === r.id} className={`cursor-pointer ${selectedId === r.id ? "bg-blue-50" : "hover:bg-slate-50"}`}>
-      <td><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: LAYER[r.kind].color }} />{LAYER[r.kind].short}</td>
+      <td><span className="mr-1.5 inline-block align-middle"><EvidenceKey kind={r.kind} /></span>{LAYER[r.kind].short}</td>
       <td><button type="button" dir="auto" className="text-left hover:underline" onClick={e => { e.stopPropagation(); onSelect(r); }}>{r.title}</button></td>
       <td className="whitespace-nowrap">{r.date || "—"}</td><td className="whitespace-nowrap">{r.kind === "market" ? `${String(r.value)} ${r.unit || ""}` : money(r.price, r.currency)}</td>
       <td className="whitespace-nowrap">{r.price_per_sqm == null ? "—" : `${n0.format(r.price_per_sqm)} ${r.currency}/m²`}</td><td>{r.area_sqm == null ? "—" : `${n0.format(r.area_sqm)} m²`}</td>

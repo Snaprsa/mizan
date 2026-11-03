@@ -27,7 +27,7 @@ export default function MonitorHome() {
         <p className="mt-0.5 max-w-xl text-[14px] text-black/50">What your portfolio is worth now, what changed since the last valuation, why, and what needs your attention.</p></div>
       <Button tone="primary" onClick={() => setAdding(a => !a)}><Plus size={15} />New portfolio</Button>
     </div>
-    {error && <p className="mb-4 rounded-xl bg-[#FF3B30]/10 px-4 py-2.5 text-[13px] text-[#c4271d]">{error}</p>}
+    {error && <p className="mb-4 rounded-xl bg-[#FF3B30]/10 px-4 py-2.5 text-[13px] text-[#C0271B]">{error}</p>}
     {adding && <form onSubmit={create} className="mb-5 grid gap-3 rounded-2xl bg-white p-4 ring-1 ring-black/[0.05] sm:grid-cols-2">
       <Field label="Portfolio name"><input name="name" required maxLength={255} className={inputClass} autoFocus /></Field>
       <Field label="Owner or entity (optional)"><input name="owner" className={inputClass} /></Field>

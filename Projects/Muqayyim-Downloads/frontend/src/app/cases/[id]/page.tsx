@@ -57,7 +57,7 @@ export default function CaseDetailPage() {
         <span className="text-slate-600">{caseData.title}</span>
       </div>
 
-      <Link href={`/map?case_id=${caseId}`} className="inline-block text-sm text-[#007AFF] mb-4">View this case on the map →</Link>
+      <Link href={`/map?case_id=${caseId}`} className="inline-block text-sm text-[#0071E3] mb-4">View this case on the map →</Link>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
@@ -81,7 +81,7 @@ export default function CaseDetailPage() {
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
               tab === t.id
-                ? "border-blue-600 text-[#007AFF]"
+                ? "border-blue-600 text-[#0071E3]"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
             }`}
           >
@@ -233,7 +233,7 @@ function SourcesTab({ caseId }: { caseId: string }) {
           <button
             type="submit"
             disabled={loading || !url.trim()}
-            className="px-4 py-2.5 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
+            className="px-4 py-2.5 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062C4] disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
           >
             Add URL
           </button>
@@ -242,7 +242,7 @@ function SourcesTab({ caseId }: { caseId: string }) {
         {/* PDF upload */}
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400">or</span>
-          <label className="inline-flex items-center gap-1.5 px-3 py-2 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 hover:border-blue-400 hover:text-[#007AFF] cursor-pointer transition-colors">
+          <label className="inline-flex items-center gap-1.5 px-3 py-2 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 hover:border-blue-400 hover:text-[#0071E3] cursor-pointer transition-colors">
             <FileUp size={13} />
             Upload PDF
             <input type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
@@ -276,14 +276,14 @@ function SourcesTab({ caseId }: { caseId: string }) {
                   <td className="px-5 py-3 max-w-sm">
                     {s.url ? (
                       <a href={s.url} target="_blank" rel="noopener noreferrer"
-                        className="text-[#007AFF] hover:underline text-xs truncate block">{s.url}</a>
+                        className="text-[#0071E3] hover:underline text-xs truncate block">{s.url}</a>
                     ) : (
                       <span className="text-xs text-slate-600">{s.file_name || "—"}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      s.source_type === "url" ? "bg-blue-50 text-[#007AFF]" : "bg-purple-50 text-purple-600"
+                      s.source_type === "url" ? "bg-blue-50 text-[#0071E3]" : "bg-purple-50 text-purple-600"
                     }`}>
                       {s.source_type.toUpperCase()}
                     </span>
@@ -322,7 +322,7 @@ function SourcesTab({ caseId }: { caseId: string }) {
 function SourceStatusBadge({ status, errorMessage }: { status: string; errorMessage: string | null }) {
   const styles: Record<string, string> = {
     pending:   "bg-slate-100 text-slate-500",
-    fetched:   "bg-blue-50 text-[#007AFF]",
+    fetched:   "bg-blue-50 text-[#0071E3]",
     completed: "bg-green-50 text-green-700",
     failed:    "bg-red-50 text-red-600",
   };
@@ -453,7 +453,7 @@ function ComparablesTab({ caseId }: { caseId: string }) {
                       const f = comp.extracted_fields[0];
                       if (f) setSelectedField({ comp, field: f });
                     }}
-                    className="text-[11px] text-[#007AFF] hover:underline"
+                    className="text-[11px] text-[#0071E3] hover:underline"
                   >
                     All fields
                   </button>
@@ -487,7 +487,7 @@ function EvidenceBadge({ evidenceType }: { evidenceType: string | null }) {
   const styles: Record<string, string> = {
     transaction_achieved: "bg-green-50 text-green-700 border border-green-200",
     listing_asking:       "bg-amber-50 text-amber-700 border border-amber-200",
-    official_record:      "bg-blue-50 text-[#007AFF] border border-blue-200",
+    official_record:      "bg-blue-50 text-[#0071E3] border border-blue-200",
   };
   const label = EVIDENCE_LABELS[evidenceType || "unknown"] || evidenceType || "—";
   return (
@@ -593,7 +593,7 @@ function Row({ label, value, highlight }: { label: string; value: string | null 
   return (
     <div className="flex gap-3">
       <span className="text-slate-400 w-28 shrink-0 text-xs">{label}</span>
-      <span className={`text-xs break-all ${highlight ? "text-[#007AFF] font-semibold" : "text-slate-700"}`}>{value || "—"}</span>
+      <span className={`text-xs break-all ${highlight ? "text-[#0071E3] font-semibold" : "text-slate-700"}`}>{value || "—"}</span>
     </div>
   );
 }
@@ -677,7 +677,7 @@ function OverrideModal({
           <button
             onClick={handleSave}
             disabled={saving || !reason.trim()}
-            className="px-4 py-2 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] disabled:opacity-50 transition-colors"
+            className="px-4 py-2 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062C4] disabled:opacity-50 transition-colors"
           >
             {saving ? "Saving…" : "Save Override"}
           </button>
@@ -713,7 +713,7 @@ function ExportTab({ caseId, caseTitle }: { caseId: string; caseTitle: string })
             icon={<FileText size={20} />}
             format="csv"
             caseId={caseId}
-            color="bg-[#007AFF] hover:bg-[#0068d9]"
+            color="bg-[#0071E3] hover:bg-[#0062C4]"
           />
           <ExportButton
             label="PDF"

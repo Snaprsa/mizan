@@ -22,18 +22,18 @@ function PortfolioPage() {
   useEffect(() => { load().then(() => checkPortfolio(id, true).then(r => { if (r.updated) { setNotice(`${r.updated} ${r.updated === 1 ? "asset" : "assets"} updated from new evidence.`); load(); } }).catch(() => undefined)); }, [id, load]);
   const go = (next: Tab, extra = "") => router.push(`/monitor/${id}?tab=${next}${extra}`, { scroll: false });
   const check = async () => { setChecking(true); setNotice(""); try { const r = await checkPortfolio(id); setNotice(`Checked ${r.checked} ${r.checked === 1 ? "asset" : "assets"}: ${r.updated} changed, ${r.unchanged} unchanged.`); await load(); } catch (e) { setError(errorText(e)); } setChecking(false); };
-  if (error && !board) return <p className="rounded-xl bg-[#FF3B30]/10 px-4 py-3 text-[14px] text-[#c4271d]">{error}</p>;
+  if (error && !board) return <p className="rounded-xl bg-[#FF3B30]/10 px-4 py-3 text-[14px] text-[#C0271B]">{error}</p>;
   if (!board) return <p className="py-16 text-center text-[14px] text-black/40">Loading…</p>;
   return <div>
-    <Link href="/monitor" className="-ml-1.5 mb-2 inline-flex items-center text-[14px] text-[#007AFF]"><ChevronLeft size={18} />Monitor</Link>
+    <Link href="/monitor" className="-ml-1.5 mb-2 inline-flex items-center text-[14px] text-[#0071E3]"><ChevronLeft size={18} />Monitor</Link>
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><h1 className="text-[28px] font-semibold leading-tight tracking-tight" dir="auto">{board.name}</h1>
         <p className="text-[13px] text-black/45" dir="auto">{[board.asset_manager, board.fund].filter((v, i, a) => v && a.indexOf(v) === i).join(" · ") || "Mizan Monitor"}{board.last_checked_at ? ` · Checked ${ageLabel(board.last_checked_at.slice(0, 10), board.as_of).toLowerCase()}` : ""}</p></div>
       <div className="flex gap-2"><Button onClick={check} disabled={checking}><RefreshCw size={14} className={checking ? "animate-spin" : ""} />{checking ? "Checking…" : "Check now"}</Button><Link href={`/monitor/${id}/report`} className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.06] px-3.5 py-1.5 text-[13.5px] font-medium text-black/80 hover:bg-black/[0.09]"><FileText size={14} />Report</Link></div>
     </div>
     {board.is_demo && <DemoBanner />}
-    {notice && <p className="mb-4 rounded-xl bg-[#007AFF]/10 px-4 py-2.5 text-[13px] text-[#0058b8]">{notice}</p>}
-    {error && <p className="mb-4 rounded-xl bg-[#FF3B30]/10 px-4 py-2.5 text-[13px] text-[#c4271d]">{error}</p>}
+    {notice && <p className="mb-4 rounded-xl bg-[#0071E3]/10 px-4 py-2.5 text-[13px] text-[#0062C4]">{notice}</p>}
+    {error && <p className="mb-4 rounded-xl bg-[#FF3B30]/10 px-4 py-2.5 text-[13px] text-[#C0271B]">{error}</p>}
     <div className="mb-5 overflow-x-auto"><div className="min-w-[520px]"><Segmented label="Portfolio view" value={tab} options={TABS} onChange={v => go(v)} /></div></div>
     {tab === "overview" && <Overview board={board} onAttention={() => go("assets", "&attention=1")} onAdd={() => go("settings")} onAlerts={() => go("alerts")} />}
     {tab === "assets" && <Assets id={id} attentionOnly={attentionOnly} clearAttention={() => go("assets")} />}
@@ -56,8 +56,8 @@ function Overview({ board, onAttention, onAdd, onAlerts }: { board: Dashboard; o
       <div className="mt-0.5 text-[44px] font-semibold leading-none tracking-tight text-black/90">{sar(t.value)}</div>
       {t.change != null ? <p className="mt-2 text-[16px]"><Movement value={t.change}><b className="font-semibold">{sar(t.change, true)}</b> · {pct(t.change_pct, 2)}</Movement> <span className="text-black/50">against {sar(t.like_official)} official{t.compared_count < t.asset_count ? `, on the ${t.compared_count} of ${t.asset_count} assets that have one` : ""}</span></p> : <p className="mt-2 text-[14px] text-black/50">No official valuations recorded yet, so there is nothing to compare with.</p>}
       {notValued > 0 && <p className="mt-1 text-[12.5px] text-black/45">{t.indicative_count} of {t.asset_count} assets have a Mizan value{t.official_only_count ? `; ${t.official_only_count} use their official value` : ""}{t.unvalued_count ? `; ${t.unvalued_count} are not counted because they have no value` : ""}.</p>}
-      {board.attention_count > 0 ? <button type="button" onClick={onAttention} className="mt-4 flex w-full items-center justify-between rounded-xl bg-[#FF3B30]/[0.08] px-4 py-3 text-left hover:bg-[#FF3B30]/[0.12]"><span className="text-[15px] font-semibold text-[#c4271d]">{board.attention_count} {board.attention_count === 1 ? "asset needs" : "assets need"} attention</span><ChevronRight size={18} className="text-[#c4271d]/60" /></button>
-        : <p className="mt-4 rounded-xl bg-[#34C759]/10 px-4 py-3 text-[14px] text-[#1c7a3a]">Nothing needs attention right now.</p>}
+      {board.attention_count > 0 ? <button type="button" onClick={onAttention} className="mt-4 flex w-full items-center justify-between rounded-xl bg-[#FF3B30]/[0.08] px-4 py-3 text-left hover:bg-[#FF3B30]/[0.12]"><span className="text-[15px] font-semibold text-[#C0271B]">{board.attention_count} {board.attention_count === 1 ? "asset needs" : "assets need"} attention</span><ChevronRight size={18} className="text-[#C0271B]/60" /></button>
+        : <p className="mt-4 rounded-xl bg-[#34C759]/10 px-4 py-3 text-[14px] text-[#17722F]">Nothing needs attention right now.</p>}
       <div className="mt-4 grid grid-cols-2 gap-4 border-t border-black/[0.06] pt-4 sm:grid-cols-4">
         <Stat label="Properties" value={t.asset_count} /><Stat label="Rising" value={t.up} detail={`above +${board.settings.stable_band_pct}%`} /><Stat label="Stable" value={t.stable} /><Stat label="Falling" value={t.down} detail={t.not_comparable ? `${t.not_comparable} not comparable` : undefined} />
       </div>
@@ -82,7 +82,7 @@ function Overview({ board, onAttention, onAdd, onAlerts }: { board: Dashboard; o
       <Card title="Sector"><ShareBars rows={t.by_type} /></Card>
       <Card title="Geography"><ShareBars rows={t.by_city} /></Card>
     </div>
-    {board.alerts.length > 0 && <Card title="Latest alerts" action={<button type="button" className="text-[13px] text-[#007AFF]" onClick={onAlerts}>All {board.alerts.length}</button>}>
+    {board.alerts.length > 0 && <Card title="Latest alerts" action={<button type="button" className="text-[13px] text-[#0071E3]" onClick={onAlerts}>All {board.alerts.length}</button>}>
       <div className="-my-2.5 divide-y divide-black/[0.06]">{board.alerts.slice(0, 4).map(a => <AlertRow key={a.id} alert={a} href={a.asset_id ? `/monitor/assets/${a.asset_id}` : undefined} />)}</div></Card>}
   </>;
 }
@@ -96,7 +96,7 @@ function Assets({ id, attentionOnly, clearAttention }: { id: string; attentionOn
   const download = () => { const url = URL.createObjectURL(new Blob([assetsCsv(rows)], { type: "text/csv;charset=utf-8" })); const a = document.createElement("a"); a.href = url; a.download = "mizan-monitor-assets.csv"; a.click(); URL.revokeObjectURL(url); };
   const select = "rounded-lg border border-black/10 bg-white px-2 py-1.5 text-[13px]";
   return <>
-    {attentionOnly && <div className="mb-3 flex items-center justify-between rounded-xl bg-[#FF3B30]/[0.08] px-4 py-2 text-[13.5px] text-[#c4271d]"><span>Assets with a warning or critical alert, highest priority first</span><button type="button" className="text-[#007AFF]" onClick={clearAttention}>Show all</button></div>}
+    {attentionOnly && <div className="mb-3 flex items-center justify-between rounded-xl bg-[#FF3B30]/[0.08] px-4 py-2 text-[13.5px] text-[#C0271B]"><span>Assets with a warning or critical alert, highest priority first</span><button type="button" className="text-[#0071E3]" onClick={clearAttention}>Show all</button></div>}
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <input aria-label="Search assets" value={q} onChange={e => setQ(e.target.value)} placeholder="Search" className={`${select} w-36`} />
       <select aria-label="City" className={select} value={city} onChange={e => setCity(e.target.value)}><option value="">All cities</option>{facets.cities.map(c => <option key={c}>{c}</option>)}</select>
@@ -116,7 +116,7 @@ function Assets({ id, attentionOnly, clearAttention }: { id: string; attentionOn
           <td className="px-2 py-2"><GradeLabel grade={r.confidence} /></td><td className="px-2 py-2 text-right tabular-nums text-black/55">{pct(r.ltv_pct, 0, false)}</td><td className="px-2 py-2 text-right tabular-nums text-black/55">{pct(r.occupancy_pct, 0, false)}</td>
           <td className="max-w-[230px] truncate px-3 py-2 text-[12.5px] text-black/50">{r.priority.reasons[0]?.reason ?? (r.value == null ? "No Mizan value yet" : "")}</td></tr>)}
           {!rows.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-black/45">No assets match.</td></tr>}</tbody></table></div>}
-    <p className="mt-2 px-1 text-[12.5px] text-black/45">{rows.length} of {total} {total > rows.length && <button type="button" className="ml-2 text-[#007AFF]" onClick={() => setLimit(l => l + 200)}>Show more</button>}</p>
+    <p className="mt-2 px-1 text-[12.5px] text-black/45">{rows.length} of {total} {total > rows.length && <button type="button" className="ml-2 text-[#0071E3]" onClick={() => setLimit(l => l + 200)}>Show more</button>}</p>
   </>;
 }
 
@@ -142,12 +142,12 @@ function RevalueFirst({ board }: { board: Dashboard }) {
 function Stress({ id }: { id: string }) {
   const [data, setData] = useState<StressResult | null>(null); const [open, setOpen] = useState<string | null>(null); const [error, setError] = useState("");
   useEffect(() => { getStress(id).then(setData).catch(e => setError(errorText(e))); }, [id]);
-  if (error) return <p className="text-[14px] text-[#c4271d]">{error}</p>;
+  if (error) return <p className="text-[14px] text-[#C0271B]">{error}</p>;
   if (!data) return <p className="py-10 text-center text-[14px] text-black/40">Running each asset through the engine…</p>;
   return <Card footer={data.notice}><div className="mb-3 flex gap-8"><Stat label="Today" value={sar(data.base_value)} detail={`${data.asset_count} assets`} /><Stat label="LTV today" value={pct(data.base_ltv_pct, 1, false)} /></div>
     <div className="divide-y divide-black/[0.06]">{data.scenarios.map(s => <div key={s.key} className="py-2"><button type="button" aria-expanded={open === s.key} className="grid w-full grid-cols-[1fr_auto_auto_auto] items-baseline gap-x-5 text-left text-[14px]" onClick={() => setOpen(open === s.key ? null : s.key)}>
       <span className="font-medium text-black/85">{s.label}<span className="ml-2 text-[12px] font-normal text-black/45">{s.affected} assets move</span></span><span className="tabular-nums text-black/70">{sar(s.value)}</span><span className="w-16 text-right tabular-nums"><Movement value={s.change_pct}>{pct(s.change_pct)}</Movement></span><span className="w-20 text-right tabular-nums text-black/55">LTV {pct(s.ltv_pct, 1, false)}</span></button>
-      {open === s.key && <ul className="m-0 mt-2 list-none space-y-1 p-0 pl-3 text-[13px]">{s.worst.map(w => <li key={w.id} className="flex justify-between gap-3"><Link href={`/monitor/assets/${w.id}`} className="truncate text-[#007AFF]" dir="auto">{w.name}</Link><span className="whitespace-nowrap tabular-nums text-black/60">{pct(w.change_pct)}{w.ltv_after != null ? ` · LTV ${pct(w.ltv_after, 0, false)}` : ""}</span></li>)}{!s.worst.length && <li className="text-black/45">No asset uses this input.</li>}</ul>}</div>)}</div></Card>;
+      {open === s.key && <ul className="m-0 mt-2 list-none space-y-1 p-0 pl-3 text-[13px]">{s.worst.map(w => <li key={w.id} className="flex justify-between gap-3"><Link href={`/monitor/assets/${w.id}`} className="truncate text-[#0071E3]" dir="auto">{w.name}</Link><span className="whitespace-nowrap tabular-nums text-black/60">{pct(w.change_pct)}{w.ltv_after != null ? ` · LTV ${pct(w.ltv_after, 0, false)}` : ""}</span></li>)}{!s.worst.length && <li className="text-black/45">No asset uses this input.</li>}</ul>}</div>)}</div></Card>;
 }
 
 const THRESHOLDS: [string, string][] = [["stable_band_pct", "Stable within (±%)"], ["move_watch_pct", "Move: watch (%)"], ["move_warning_pct", "Move: warning (%)"], ["move_critical_pct", "Move: critical (%)"], ["divergence_watch_pct", "Method spread: watch (%)"], ["divergence_warning_pct", "Method spread: warning (%)"], ["ltv_warning_pct", "LTV: warning (%)"], ["ltv_critical_pct", "LTV: critical (%)"], ["stale_evidence_days", "Evidence stale after (days)"], ["official_age_months", "Official is old after (months)"], ["comparable_gap_pct", "New sale gap (%)"], ["concentration_watch_pct", "Concentration: watch (%)"]];
@@ -160,7 +160,7 @@ function Settings({ board, reload }: { board: Dashboard; reload: () => void }) {
   const save = async () => { setMsg(""); try { await patchPortfolio(board.id, { settings: values }); setMsg("Thresholds saved."); reload(); } catch (e) { setMsg(errorText(e)); } };
   const drop = async () => { if (!window.confirm("Delete this portfolio? Its properties and valuation history are kept.")) return; await deletePortfolio(board.id); router.push("/monitor"); };
   return <>
-    {msg && <p className="mb-3 rounded-xl bg-[#007AFF]/10 px-4 py-2 text-[13px] text-[#0058b8]">{msg}</p>}
+    {msg && <p className="mb-3 rounded-xl bg-[#0071E3]/10 px-4 py-2 text-[13px] text-[#0062C4]">{msg}</p>}
     {!board.is_demo && <Card title="Add properties" footer="Monitor values an asset from the inputs you reviewed in its valuation. A property without complete inputs joins with no Mizan value until they are saved.">
       <input aria-label="Search properties" value={q} onChange={e => setQ(e.target.value)} placeholder="Search your properties" className={`${inputClass} mb-2`} />
       <div className="max-h-64 divide-y divide-black/[0.05] overflow-y-auto">{props.map(p => <label key={p.id} className="flex cursor-pointer items-center gap-2.5 py-2 text-[14px]"><input type="checkbox" checked={picked.has(p.id)} onChange={e => setPicked(s => { const n = new Set(s); if (e.target.checked) n.add(p.id); else n.delete(p.id); return n; })} /><span className="truncate" dir="auto">{p.name}</span><span className="ml-auto whitespace-nowrap text-[12px] text-black/40">{titleCase(p.property_type)}</span></label>)}{!props.length && <p className="py-4 text-center text-[13px] text-black/45">No properties found.</p>}</div>

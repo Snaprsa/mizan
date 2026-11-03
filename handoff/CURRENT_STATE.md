@@ -27,7 +27,7 @@ The active application is `Projects/Muqayyim-Downloads`. Keep this relative path
 | Reuse | Income/DCF/cost classes loaded from `Projects/Mizan-Antigravity/src/mizan_engine/approaches` through an adapter |
 | Monitor | `/monitor`: portfolios over existing properties. Indicative values rerun the shared engine only when inputs or evidence change; immutable snapshots; driver attribution by rerun; rule-based High/Medium/Low evidence grade (no percentage); deduplicated, self-resolving alerts; revaluation priority with reasons; NAV/LTV/NOI; stress tests; audit trail; printable report and CSV; opt-in labelled demo fund kept off the map, Properties and real valuations. See `handoff/MIZAN_MONITOR_REPORT.md` |
 | Auth | Local development identity; JWT/persisted-user checks and ownership across property and legacy case/evidence routes, with read-only-role mutation guards. Production authentication and institutional tenancy remain incomplete |
-| Design | Blue/slate palette, dense tables, functional but basic map screen; no completed professional redesign |
+| Design | Applied from the owner's Claude Design redesign (3 Nov 2026): accent #0071E3 and design-system status colours; solid map card with Explore/Monitor switch, count rows and one primary action; evidence markers coded by shape (circle sale, diamond listing, blue square property) with matching legend keys; blue-dot subject; step progress in the valuation flow; outlined data labels, dashed amber demo labels, confidence bars and severity chips in Monitor. Sidebar navigation kept |
 
 ## Real limitations
 

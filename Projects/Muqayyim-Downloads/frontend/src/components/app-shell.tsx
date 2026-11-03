@@ -29,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return <div className="flex h-screen overflow-hidden bg-[#f5f5f7] print:block print:h-auto print:overflow-visible print:bg-white">
     <aside className={`${isCollapsed ? "w-14" : "w-52"} flex flex-shrink-0 select-none flex-col border-r print:hidden border-black/[0.06] bg-white/70 backdrop-blur-xl transition-[width] duration-100`} aria-label="Main navigation">
       <div className="flex h-14 items-center gap-2.5 px-3">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#007AFF]"><Building2 className="h-4 w-4 text-white" /></div>
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#0071E3]"><Building2 className="h-4 w-4 text-white" /></div>
         {!isCollapsed && <div className="truncate text-[15px] font-semibold text-black/85">Mizan <span lang="ar" className="font-normal text-black/40">ميزان</span></div>}
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
@@ -45,7 +45,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 function NavLink({ href, icon: Icon, label, active, collapsed }: { href: string; icon: typeof MapPin; label: string; active: boolean; collapsed: boolean }) {
   return <Link href={href} title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined} aria-current={active ? "page" : undefined}
-    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] ${active ? "bg-[#007AFF]/10 font-medium text-[#007AFF]" : "text-black/70 hover:bg-black/[0.04]"}`}>
+    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] ${active ? "bg-[#0071E3]/10 font-medium text-[#0071E3]" : "text-black/70 hover:bg-black/[0.04]"}`}>
     <Icon size={16} className="shrink-0" />{!collapsed && <span className="truncate">{label}</span>}
   </Link>;
 }

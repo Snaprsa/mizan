@@ -1,5 +1,16 @@
 # Continuation log
 
+## 3 November 2026: Redesign applied (map first)
+
+Took the parts of the owner's Claude Design file (`Mizan Redesign.html`, not committed) that fit the existing app; nothing functional removed.
+
+- Map: shape-coded markers and white count clusters (`globals.css`, `components/map/markers.ts`), `components/map/evidence-key.tsx` for matching list keys, blue-dot subject, hollow search ring, dark attribution, demo chip. Close-up price labels keep the shape key and appear from zoom 17.
+- Card (`app/map/page.tsx`): solid surface, Explore/Monitor switch, 44 px search, count rows with medians, one "Value a property" action, list only after choosing a kind, step progress in the valuation flow; content-height card except long views.
+- Shared: accent #0071E3 and design-system positive/negative colours across the frontend; solid `Glass`; design sizes for segmented control and primary button.
+- Monitor: outlined data labels with dashed amber demo label, confidence word plus bars, severity chips, ink chart line with labelled end value, asset alerts ordered by severity.
+- Not adopted: the top-bar navigation that would hide Cases, Properties and Market data; Arabic layout and dark mode (still to do).
+- Checks: 132 backend, 24 frontend, lint, type-check, production build; browser on a disposable API with synthetic data at 1440 px and 375 px.
+
 ## 31 October 2026: Mizan Monitor
 
 Added portfolio monitoring on top of the existing valuation pipeline; no second engine. Full report: `handoff/MIZAN_MONITOR_REPORT.md`.

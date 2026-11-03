@@ -32,7 +32,7 @@ export default function DashboardPage() {
         </div>
         <Link
           href="/cases/new"
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062C4] transition-colors shadow-sm"
         >
           <Plus size={15} />
           New case
@@ -71,7 +71,7 @@ export default function DashboardPage() {
           <p className="text-slate-400 text-sm mb-5">Create your first valuation case to get started</p>
           <Link
             href="/cases/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007AFF] text-white rounded-full text-sm font-medium hover:bg-[#0068d9] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062C4] transition-colors"
           >
             <Plus size={14} /> Create Case
           </Link>
@@ -95,7 +95,7 @@ export default function DashboardPage() {
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors cursor-pointer group">
                   <td className="px-5 py-3.5">
                     <Link href={`/cases/${c.id}`} className="block">
-                      <div className="font-medium text-slate-900 group-hover:text-[#007AFF] transition-colors">{c.title}</div>
+                      <div className="font-medium text-slate-900 group-hover:text-[#0071E3] transition-colors">{c.title}</div>
                       {c.description && (
                         <div className="text-xs text-slate-400 mt-0.5 truncate max-w-sm">{c.description}</div>
                       )}
@@ -132,7 +132,7 @@ function StatCard({
   color: "blue" | "green" | "purple" | "orange";
 }) {
   const colors = {
-    blue:   "bg-blue-50 text-[#007AFF]",
+    blue:   "bg-blue-50 text-[#0071E3]",
     green:  "bg-green-50 text-green-600",
     purple: "bg-purple-50 text-purple-600",
     orange: "bg-orange-50 text-orange-600",
@@ -151,7 +151,7 @@ function StatCard({
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     draft:       "bg-slate-100 text-slate-500",
-    in_progress: "bg-blue-50 text-[#007AFF] border border-blue-200",
+    in_progress: "bg-blue-50 text-[#0071E3] border border-blue-200",
     review:      "bg-amber-50 text-amber-700 border border-amber-200",
     completed:   "bg-green-50 text-green-700 border border-green-200",
     archived:    "bg-slate-100 text-slate-400",

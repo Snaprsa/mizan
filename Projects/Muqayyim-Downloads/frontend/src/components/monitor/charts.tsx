@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { pct, sar } from "@/lib/monitor";
 
-const BLUE = "#007AFF"; const INK = "#5B5B60";
+const LINE = "#1D1D1F"; const BLUE = "#0071E3"; const INK = "#5F5F64";
 type Point = { date: string; indicative: number | null; official: number | null; low?: number | null; high?: number | null };
 const day = (d: string) => Date.parse(`${d}T00:00:00Z`);
 function niceTicks(min: number, max: number, count = 4) {
@@ -17,7 +17,7 @@ const short = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("
 /** Value through time. Mizan is the line; official valuations are stepped, dashed and dotted so they read differently without colour. */
 export function ValueChart({ points, height = 230, label }: { points: Point[]; height?: number; label: string }) {
   const [hover, setHover] = useState<number | null>(null); const ref = useRef<SVGSVGElement>(null);
-  const W = 720, L = 64, R = 14, T = 12, B = 26;
+  const W = 720, L = 64, R = 14, T = 24, B = 26;
   const chart = useMemo(() => {
     const values = points.flatMap(p => [p.indicative, p.official, p.low, p.high]).filter((v): v is number => v != null);
     if (points.length < 2 || !values.length) return null;
@@ -30,7 +30,8 @@ export function ValueChart({ points, height = 230, label }: { points: Point[]; h
     const banded = points.filter(p => p.low != null && p.high != null);
     const band = banded.length > 1 ? `${banded.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)} ${y(p.high!).toFixed(1)}`).join(" ")} ${[...banded].reverse().map(p => `L${x(p.date).toFixed(1)} ${y(p.low!).toFixed(1)}`).join(" ")} Z` : null;
     const labels = points.length <= 6 ? points : Array.from({ length: 6 }, (_, i) => points[Math.round(i * (points.length - 1) / 5)]);
-    return { ticks, x, y, indicative: line("indicative"), official: line("official"), band, labels };
+    const end = [...points].reverse().find(p => p.indicative != null);
+    return { ticks, x, y, indicative: line("indicative"), official: line("official"), band, labels, last: end ? { x: x(end.date), y: y(end.indicative!), v: end.indicative! } : null };
   }, [points, height]);
   if (!chart) return <p className="py-10 text-center text-[13px] text-black/45">Not enough history in this period to draw a chart.</p>;
   const hasOfficial = points.some(p => p.official != null);
@@ -39,18 +40,19 @@ export function ValueChart({ points, height = 230, label }: { points: Point[]; h
     let best = 0, gap = Infinity; points.forEach((p, i) => { const g = Math.abs(chart.x(p.date) - px); if (g < gap) { gap = g; best = i; } }); setHover(best); };
   return <figure className="m-0">
     <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-black/55">
-      <span className="inline-flex items-center gap-1.5"><svg width="18" height="4" aria-hidden><line x1="0" x2="18" y1="2" y2="2" stroke={BLUE} strokeWidth="2" /></svg>Mizan indicative</span>
-      {hasOfficial && <span className="inline-flex items-center gap-1.5"><svg width="18" height="4" aria-hidden><line x1="0" x2="18" y1="2" y2="2" stroke={INK} strokeWidth="2" strokeDasharray="4 3" /></svg>Official</span>}
+      <span className="inline-flex items-center gap-1.5"><svg width="18" height="4" aria-hidden><line x1="0" x2="18" y1="2" y2="2" stroke={LINE} strokeWidth="2" /></svg>Mizan indicative</span>
+      {hasOfficial && <span className="inline-flex items-center gap-1.5"><svg width="18" height="4" aria-hidden><line x1="0" x2="18" y1="2" y2="2" stroke={INK} strokeWidth="1.5" strokeDasharray="5 4" /></svg>Official</span>}
       {chart.band && <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm" style={{ background: "rgba(0,122,255,.13)" }} />Range</span>}
     </div>
     <svg ref={ref} viewBox={`0 0 ${W} ${height}`} className="block w-full touch-none" role="img" aria-label={label} onMouseMove={move} onMouseLeave={() => setHover(null)}>
       {chart.ticks.map(t => <g key={t}><line x1={L} x2={W - R} y1={chart.y(t)} y2={chart.y(t)} stroke="rgba(0,0,0,.06)" /><text x={L - 8} y={chart.y(t) + 4} textAnchor="end" fontSize="11" fill="rgba(0,0,0,.45)">{sar(t).replace("SAR ", "")}</text></g>)}
       {chart.labels.map((p, i) => <text key={p.date} x={chart.x(p.date)} y={height - 7} textAnchor={i === chart.labels.length - 1 ? "end" : "middle"} fontSize="11" fill="rgba(0,0,0,.45)">{short(p.date)}</text>)}
       {chart.band && <path d={chart.band} fill="rgba(0,122,255,.13)" />}
-      {hasOfficial && <path d={chart.official} fill="none" stroke={INK} strokeWidth="2" strokeDasharray="4 3" />}
-      <path d={chart.indicative} fill="none" stroke={BLUE} strokeWidth="2" strokeLinejoin="round" />
+      {hasOfficial && <path d={chart.official} fill="none" stroke={INK} strokeWidth="1.5" strokeDasharray="5 4" />}
+      <path d={chart.indicative} fill="none" stroke={LINE} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {chart.last && <g><circle cx={chart.last.x} cy={chart.last.y} r="4" fill={LINE} /><text x={chart.last.x} y={chart.last.y - 10} textAnchor="end" fontSize="12" fontWeight="600" fill={LINE}>{sar(chart.last.v)}</text></g>}
       {point && <g><line x1={chart.x(point.date)} x2={chart.x(point.date)} y1={T} y2={height - B} stroke="rgba(0,0,0,.25)" />
-        {point.indicative != null && <circle cx={chart.x(point.date)} cy={chart.y(point.indicative)} r="4" fill={BLUE} stroke="#fff" strokeWidth="2" />}
+        {point.indicative != null && <circle cx={chart.x(point.date)} cy={chart.y(point.indicative)} r="4" fill={LINE} stroke="#fff" strokeWidth="2" />}
         {point.official != null && <circle cx={chart.x(point.date)} cy={chart.y(point.official)} r="4" fill={INK} stroke="#fff" strokeWidth="2" />}</g>}
     </svg>
     <figcaption className="h-5 text-[12.5px] text-black/60">{point ? <>{point.date} · Mizan {sar(point.indicative)}{hasOfficial ? ` · Official ${sar(point.official)}` : ""}{point.low != null ? ` · Range ${sar(point.low)} to ${sar(point.high)}` : ""}</> : <span className="text-black/35">Hover for values</span>}</figcaption>
@@ -94,6 +96,6 @@ export function BubbleScatter({ points, onOpen }: { points: ScatterPoint[]; onOp
 export function ShareBars({ rows }: { rows: { key: string; label: string; share_pct: number; value: number }[] }) {
   return <ul className="m-0 list-none space-y-2 p-0">{rows.slice(0, 6).map(r => <li key={r.key} className="text-[13.5px]">
     <div className="flex justify-between gap-3"><span className="truncate text-black/70">{r.label}</span><span className="tabular-nums text-black/55">{r.share_pct.toFixed(0)}%</span></div>
-    <div className="mt-1 h-1.5 rounded-full bg-black/[0.06]"><div className="h-full rounded-full bg-[#007AFF]" style={{ width: `${r.share_pct}%` }} /></div>
+    <div className="mt-1 h-1.5 rounded-full bg-black/[0.06]"><div className="h-full rounded-full bg-[#0071E3]" style={{ width: `${r.share_pct}%` }} /></div>
   </li>)}</ul>;
 }

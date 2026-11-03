@@ -34,7 +34,7 @@ export default function DataPage() {
     </div>
     <details className="mizan-panel"><summary className="cursor-pointer text-[15px] font-medium">Import observations</summary><div className="mt-3">
     <form onSubmit={upload} className="space-y-3"><p className="text-xs text-slate-500">Use UTF-8 CSV, ISO dates (YYYY-MM-DD), explicit units and reliability from 0–100. Preserve the original value and provide the normalized value yourself. Imports are append-only; changed evidence requires a new external ID. Max 1,000 rows / 2 MB.</p>
-      <button type="button" className="text-sm text-[#007AFF] underline" onClick={template}>Download empty CSV template</button>
+      <button type="button" className="text-sm text-[#0071E3] underline" onClick={template}>Download empty CSV template</button>
       <label className="mizan-label">Source<select aria-label="Source" className="mizan-input" required value={sourceId} onChange={e => setSourceId(e.target.value)}><option value="">Select source</option>{sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       <label className="mizan-label">CSV file<input className="mizan-input" name="file" type="file" accept=".csv,text/csv" required /></label><button className="mizan-button" disabled={busy || !sourceId}>{busy ? "Working…" : "Import CSV"}</button>
     </form>

@@ -14,13 +14,13 @@ export default function ReportPage() {
     const [b, assets] = await Promise.all([getDashboard(id), listAssets(id, { sort: "change", limit: "5000" })]); setBoard(b); setRows(assets.data);
     setDetail(await Promise.all(b.priority.slice(0, 5).map(a => getAsset(a.id))));
   } catch (e) { setError(errorText(e)); } })(); }, [id]);
-  if (error) return <p className="text-[14px] text-[#c4271d]">{error}</p>;
+  if (error) return <p className="text-[14px] text-[#C0271B]">{error}</p>;
   if (!board) return <p className="py-16 text-center text-[14px] text-black/40">Preparing the report…</p>;
   const t = board.totals;
   const moves = rows.filter(r => r.change_vs_official_pct != null && Math.abs(r.change_vs_official_pct) >= board.settings.move_watch_pct);
   const low = rows.filter(r => r.confidence === "low");
   return <div className="report text-[14px] text-black/80">
-    <div className="mb-4 flex items-center justify-between print:hidden"><Link href={`/monitor/${id}`} className="-ml-1.5 inline-flex items-center text-[14px] text-[#007AFF]"><ChevronLeft size={18} />Back</Link><Button tone="primary" onClick={() => window.print()}><Printer size={14} />Print or save as PDF</Button></div>
+    <div className="mb-4 flex items-center justify-between print:hidden"><Link href={`/monitor/${id}`} className="-ml-1.5 inline-flex items-center text-[14px] text-[#0071E3]"><ChevronLeft size={18} />Back</Link><Button tone="primary" onClick={() => window.print()}><Printer size={14} />Print or save as PDF</Button></div>
     <h1 className="text-[26px] font-semibold tracking-tight" dir="auto">Portfolio Valuation Monitor</h1>
     <p className="mb-4 text-black/50" dir="auto">{board.name} · as of {board.as_of}</p>
     {board.is_demo && <DemoBanner />}

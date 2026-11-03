@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Circle, Expand, Hexagon, Layers, LocateFixed, Map as MapIcon, Menu, Minus, PencilRuler, Plus, Ruler, Scan, Shrink, SlidersHorizontal, Square, Table2, X } from "lucide-react";
+import { Check, ChevronRight, Circle, Expand, Hexagon, Layers, LocateFixed, Map as MapIcon, Menu, Minus, PencilRuler, Plus, Ruler, Scan, Shrink, SlidersHorizontal, Square, Table2, X } from "lucide-react";
 import { getMapRecords, getProperty, saveProperty, getValuationCatalog, startMapAnalysis, type MapRecord, type MapResponse, type PreparedAnalysis, type ValuationMethod } from "@/lib/api";
 import ValuationWorkflow from "@/components/valuation-workflow";
 import { areaPoints, formatArea, formatDistance, geodesicAreaSqm, haversineMeters, inSearchArea, latLngsFromPolygon, pathLengthMeters, polygonFromLatLngs, type GeoJSONPolygon, type LatLng, type SearchArea } from "@/lib/geo";
@@ -16,7 +16,8 @@ import MapSearch from "@/components/map/map-search";
 import MapStylePanel from "@/components/map/map-style-panel";
 import { CoveragePanel, EvidenceTable, money, precisionLabel } from "@/components/map/evidence-panels";
 import type { Draft, MapBounds, MapStatus, MapTool, RendererHandle } from "@/components/map/types";
-import { Dot, Glass, PrimaryButton, Row, Section, Segmented, SheetHeader, Switch } from "@/components/ui/sheet-ui";
+import { Glass, PrimaryButton, Row, Section, Segmented, SheetHeader, Switch } from "@/components/ui/sheet-ui";
+import EvidenceKey from "@/components/map/evidence-key";
 
 const MapRenderer = dynamic(() => import("@/components/map/map-renderer"), { ssr: false,
   loading: () => <div className="absolute inset-0 bg-[#e8e6e1]" aria-label="Loading map" /> });
@@ -50,6 +51,7 @@ function MapWorkspace() {
   const [notice, setNotice] = useState(""); const [starting, setStarting] = useState(false); const [savingOutline, setSavingOutline] = useState(false);
   const [fullscreen, setFullscreen] = useState(false); const [narrow, setNarrow] = useState(false);
   const [popover, setPopover] = useState<"" | "style" | "tools" | "menu">(""); const [filtersOpen, setFiltersOpen] = useState(false);
+  const [kindFocus, setKindFocus] = useState<MapRecord["kind"] | null>(null);
   const [sheet, setSheet] = useState<Sheet>("half"); const [place, setPlace] = useState<LatLng | null>(null); const [listSize, setListSize] = useState(30);
   const handle = useRef<RendererHandle | null>(null); const root = useRef<HTMLDivElement>(null);
   const today = useMemo(riyadhToday, []);
@@ -218,30 +220,36 @@ function MapWorkspace() {
   const analysisTitle = nameMatch ? { title: nameMatch[1], place: nameMatch[2] } : { title: analysisName, place: "" };
 
   // ── Card content ──────────────────────────────────────────────────────────
-  const explore = <>
-    <SheetHeader title={group.length ? "Cluster" : "Explore"} subtitle={loading ? "Updating…" : `${data?.coverage?.demo_comparables ? "Includes demo data · " : ""}${listed.length} record${listed.length === 1 ? "" : "s"}${f.withinView ? " in view" : ""}${data?.truncated ? ` · first ${data.returned} of ${data.total}` : ""}`}
-      trailing={<button type="button" onClick={() => setFiltersOpen(true)} className="relative mt-1 grid h-9 w-9 place-items-center rounded-full bg-black/[0.05] text-black/70 active:bg-black/10" aria-label="Filters">
-        <SlidersHorizontal size={17} />{activeFilters > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#007AFF] px-1 text-[10px] font-semibold text-white">{activeFilters}</span>}</button>} />
-    <div className="px-4 pb-2"><PrimaryButton onClick={beginValuation}>Value a property</PrimaryButton></div>
-    <div className="px-4 py-2 grid grid-cols-3 gap-2">{(["transaction", "listing", "property"] as const).map(k => {
-      const s = summaries.find(x => x.key === `${k}:SAR`); const count = listed.filter(r => r.kind === k).length;
-      return <div key={k} className="rounded-xl bg-white ring-1 ring-black/[0.05] px-3 py-2.5">
-        <div className="flex items-center gap-1.5 text-[12px] text-black/50"><Dot color={LAYER[k].color} />{LAYER[k].short}</div>
-        <div className="text-[22px] font-semibold tracking-tight text-black/90 leading-tight mt-0.5">{count}</div>
-        <div className="text-[11.5px] text-black/45 truncate" title={s && !s.insufficient ? "Median unit value" : "Needs at least 3 values"}>{s && !s.insufficient ? `${n0.format(s.median!)} SAR/m²` : k === "property" ? "saved" : "median —"}</div></div>; })}</div>
-    <div className="px-4 py-1"><Segmented label="Scope" value={f.withinView ? "view" : "all"} onChange={v => setFilter({ withinView: v === "view" })}
-      options={[{ value: "view", label: "In map view" }, { value: "all", label: "All saved" }]} /></div>
-    {group.length > 0 && <div className="px-4 pt-2"><button type="button" className="text-[14px] text-[#007AFF]" onClick={() => setGroup([])}>Show all records</button></div>}
-    {ws.filterToArea && ws.searchArea && <div className="px-4 pt-2 text-[13px] text-black/55">Limited to your search area · <button type="button" className="text-[#007AFF]" onClick={() => update({ filterToArea: false })}>Show all</button></div>}
-    <Section title="Evidence" footer={listed.length > listSize ? <button type="button" className="text-[#007AFF]" onClick={() => setListSize(n => n + 30)}>Show more</button> : "Saved Mizan records — asking prices are never counted as sales."}>
-      {listed.slice(0, listSize).map(r => <Row key={r.id} onClick={() => selectRecord(r)} leading={<Dot color={LAYER[r.kind].color} />} label={r.title}
+  const kinds = (["transaction", "listing", "property", "other", "market"] as const).filter(k => k === "transaction" || k === "listing" || k === "property" || listed.some(r => r.kind === k));
+  const shown = kindFocus ? listed.filter(r => r.kind === kindFocus) : listed;
+  const caption = (k: MapRecord["kind"]) => { const s = summaries.find(x => x.key === `${k}:SAR`);
+    if (s && !s.insufficient) return `Median ${n0.format(s.median!)} SAR/m²`;
+    return k === "transaction" ? "Achieved prices" : k === "listing" ? "Asking prices, not sales" : k === "property" ? "Saved in Mizan" : LAYER[k].description.split(".")[0]; };
+  const evidenceList = <Section title={kindFocus ? LAYER[kindFocus].label : group.length ? "In this cluster" : "Evidence"} footer={shown.length > listSize ? <button type="button" className="text-[#0071E3]" onClick={() => setListSize(n => n + 30)}>Show more</button> : "Saved Mizan records. Asking prices are never counted as sales."}>
+      {shown.slice(0, listSize).map(r => <Row key={r.id} onClick={() => selectRecord(r)} leading={<EvidenceKey kind={r.kind} />} label={r.title}
         detail={[LAYER[r.kind].short, r.district || r.city, r.date ? (r.date > today ? `${r.date} (future)` : r.date) : "undated"].filter(Boolean).map(isolate).join(" · ")}
         value={r.kind === "market" ? `${String(r.value)}` : r.price_per_sqm != null ? `${n0.format(r.price_per_sqm)}/m²` : r.coordinates ? "" : "No location"} />)}
-      {!listed.length && !loading && <div className="px-4 py-6 text-center text-[14px] text-black/45">{f.withinView ? "Nothing in this part of the map." : "No records match your filters."}</div>}
-    </Section>
-    <Section>
-      <Row onClick={() => go("coverage")} chevron label="Data" detail={[`${unlocated.length} without a location`, `${data?.coverage?.unverified_datasets ?? 0} files not imported`, ...(data?.coverage?.demo_comparables ? [`${data.coverage.demo_comparables} demo`] : [])].join(" · ")} />
-    </Section>
+      {!shown.length && !loading && <div className="px-4 py-6 text-center text-[14px] text-black/45">{f.withinView ? "Nothing in this part of the map." : "No records match your filters."}</div>}
+    </Section>;
+  const explore = kindFocus || group.length ? <>
+    <SheetHeader onBack={() => { setKindFocus(null); setGroup([]); }} backLabel="Explore" title={kindFocus ? LAYER[kindFocus].label : "Cluster"} subtitle={`${shown.length} ${shown.length === 1 ? "record" : "records"}${f.withinView ? " in this map view" : ""}`} />
+    {evidenceList}
+  </> : <>
+    <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
+      <span className="text-[13px] text-[#5F5F64]">{loading ? "Updating…" : f.withinView ? "In this map view" : "All saved records"}{data?.truncated ? ` · first ${data.returned} of ${data.total}` : ""}</span>
+      {data?.coverage?.demo_comparables ? <OriginTag /> : null}
+    </div>
+    <div className="divide-y divide-black/[0.08]">{kinds.map(k => { const count = listed.filter(r => r.kind === k).length;
+      return <button key={k} type="button" onClick={() => setKindFocus(k)} className="flex min-h-[60px] w-full items-center gap-3 px-5 py-2.5 text-left hover:bg-black/[0.02] active:bg-black/[0.04]">
+        <EvidenceKey kind={k} /><span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold text-[#1D1D1F]">{LAYER[k].label === "Subject & saved properties" ? "My properties" : LAYER[k].label}</span>
+          <span className="block truncate text-[13px] text-[#5F5F64]">{caption(k)}</span></span>
+        <span className="text-[22px] font-semibold tabular-nums tracking-tight text-[#1D1D1F]">{count}</span><ChevronRight size={16} className="text-[#5F5F64]" /></button>; })}</div>
+    <div className="px-4 pb-2 pt-3"><PrimaryButton onClick={beginValuation}>Value a property</PrimaryButton></div>
+    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 pb-1 text-[13px]">
+      <button type="button" className="text-[#0062C4]" onClick={() => setFilter({ withinView: !f.withinView })}>{f.withinView ? "Show all saved" : "Only this map view"}</button>
+      <button type="button" className="text-[#0062C4]" onClick={() => go("coverage")}>Data{unlocated.length ? ` · ${unlocated.length} without a location` : ""}</button>
+    </div>
+    {ws.filterToArea && ws.searchArea && <div className="px-5 pt-2 text-center text-[13px] text-black/55">Limited to your search area · <button type="button" className="text-[#0062C4]" onClick={() => update({ filterToArea: false })}>Show all</button></div>}
   </>;
 
   const record = selected && <>
@@ -256,35 +264,36 @@ function MapWorkspace() {
     <Section title="Source" footer={selected.coordinates ? undefined : "No location is guessed from the city or district."}>
       <Row label="Location" detail={precisionLabel(selected.location_precision)} value={selected.coordinates ? selected.coordinates.map(v => v.toFixed(4)).join(", ") : "Missing"} />
       <Row label="Reliability" value={selected.reliability_score == null ? "Not scored" : `${selected.reliability_score} of 5`} />
-      {/^https?:\/\//i.test(selected.source) ? <Row label="Source" value={<a className="text-[#007AFF]" href={selected.source} target="_blank" rel="noopener noreferrer">{sourceLabel(selected.source)}</a>} />
+      {/^https?:\/\//i.test(selected.source) ? <Row label="Source" value={<a className="text-[#0071E3]" href={selected.source} target="_blank" rel="noopener noreferrer">{sourceLabel(selected.source)}</a>} />
         : <Row label="Source" detail={selected.source} />}
     </Section>
     <Section>
-      {selected.kind === "property" && <Row onClick={() => openProperty(selected)} label={<span className="text-[#007AFF]">Value this property</span>} />}
+      {selected.kind === "property" && <Row onClick={() => openProperty(selected)} label={<span className="text-[#0071E3]">Value this property</span>} />}
       <Row onClick={() => router.push(selected.href)} chevron label={`Open ${selected.kind === "property" ? "property" : selected.kind === "market" ? "market data" : "evidence"}`} />
     </Section>
   </>;
 
   const flow = <>
+    <StepProgress step={!ws.subject?.confirmed ? 1 : !ws.subjectType ? 2 : 3} />
     <SheetHeader onBack={() => { setTool("browse"); go("evidence"); }} backLabel="Explore" title="Value a property" subtitle="Three quick choices, then Mizan gathers the evidence." />
     <Section title="1 · Location" footer={!ws.subject ? "Tap the map where the property is, or type coordinates in the search bar." : !ws.subject.confirmed ? "Drag the pin, or select it and use the arrow keys, until it sits on the property." : undefined}>
-      {!ws.subject ? <Row label={tool === "place_subject" ? <span className="text-[#007AFF]">Tap the map to drop a pin…</span> : "Drop a pin"} onClick={() => setTool("place_subject")} leading={<LocateFixed size={18} className="text-[#007AFF]" />} />
+      {!ws.subject ? <Row label={tool === "place_subject" ? <span className="text-[#0071E3]">Tap the map to drop a pin…</span> : "Drop a pin"} onClick={() => setTool("place_subject")} leading={<LocateFixed size={18} className="text-[#0071E3]" />} />
         : <><Row label={ws.subject.confirmed ? "Location confirmed" : "Is the pin in the right place?"} detail={`${ws.subject.coordinates.map(n => n.toFixed(5)).join(", ")} · ${precisionLabel(ws.subject.precision)}`}
               leading={ws.subject.confirmed ? <Check size={18} className="text-[#34C759]" /> : <LocateFixed size={18} className="text-[#FF9F0A]" />} />
           {!ws.subject.confirmed && <div className="p-3"><PrimaryButton onClick={() => update(s => ({ subject: s.subject && { ...s.subject, confirmed: true } }))}>Confirm location</PrimaryButton></div>}
-          {!analysisId && <Row onClick={() => { setSubject(null); setTool("place_subject"); }} label={<span className="text-[#007AFF]">Move pin</span>} />}</>}
+          {!analysisId && <Row onClick={() => { setSubject(null); setTool("place_subject"); }} label={<span className="text-[#0071E3]">Move pin</span>} />}</>}
     </Section>
     {ws.subject?.confirmed && <Section title="2 · Property type">
       <div className="flex flex-wrap gap-2 p-3">{propertyTypes.map(t => <button key={t} type="button" onClick={() => update({ subjectType: t })} aria-pressed={ws.subjectType === t}
-        className={`rounded-full px-3.5 py-1.5 text-[14px] ${ws.subjectType === t ? "bg-[#007AFF] text-white" : "bg-black/[0.05] text-black/75 active:bg-black/10"}`}>{label(t)}</button>)}</div>
+        className={`rounded-full px-3.5 py-1.5 text-[14px] ${ws.subjectType === t ? "bg-[#0071E3] text-white" : "bg-black/[0.05] text-black/75 active:bg-black/10"}`}>{label(t)}</button>)}</div>
     </Section>}
     {ws.subject?.confirmed && ws.subjectType && <Section title="3 · Approach" footer={method?.fields.length ? `You'll be asked for: ${method.fields.map(x => x.label.toLowerCase()).join(", ")}.` : undefined}>
       {methods.filter(m => m.implemented).map(m => <Row key={m.key} onClick={() => update({ approach: m.key })} label={m.label} detail={m.description}
-        leading={<span className={`grid h-5 w-5 place-items-center rounded-full ${ws.approach === m.key ? "bg-[#007AFF] text-white" : "ring-1 ring-black/20"}`}>{ws.approach === m.key && <Check size={13} strokeWidth={3} />}</span>} />)}
+        leading={<span className={`grid h-5 w-5 place-items-center rounded-full ${ws.approach === m.key ? "bg-[#0071E3] text-white" : "ring-1 ring-black/20"}`}>{ws.approach === m.key && <Check size={13} strokeWidth={3} />}</span>} />)}
     </Section>}
     {ws.subject?.confirmed && ws.subjectType && <div className="px-4 py-3"><PrimaryButton disabled={starting || !method?.implemented} onClick={start}>{starting ? "Gathering evidence…" : "Start valuation"}</PrimaryButton></div>}
     {!ws.subject && all.some(r => r.kind === "property") && <Section title="Or pick a saved property">
-      {all.filter(r => r.kind === "property").slice(0, 8).map(r => <Row key={r.id} onClick={() => openProperty(r)} chevron leading={<Dot color={LAYER.property.color} />} label={r.title} detail={r.coordinates ? precisionLabel(r.location_precision) : "No location yet"} />)}
+      {all.filter(r => r.kind === "property").slice(0, 8).map(r => <Row key={r.id} onClick={() => openProperty(r)} chevron leading={<EvidenceKey kind="property" />} label={r.title} detail={r.coordinates ? precisionLabel(r.location_precision) : "No location yet"} />)}
     </Section>}
     {methods.some(m => !m.implemented) && ws.subjectType && <p className="px-5 pb-4 text-[12px] text-black/40">Not available yet: {methods.filter(m => !m.implemented).map(m => m.label).join(", ")}.</p>}
   </>;
@@ -294,15 +303,15 @@ function MapWorkspace() {
       subtitle={prepared ? [analysisTitle.place, prepared.method_label].filter(Boolean).join(" · ") : "Loading…"} />
     {ws.siteOutline && <Section title="Site outline" footer="Drawn by you on the map. Approximate — not a certified cadastral boundary.">
       <Row label="Approximate area" value={formatArea(geodesicAreaSqm(ws.siteOutline))} />
-      <Row onClick={saveOutline} label={<span className="text-[#007AFF]">{savingOutline ? "Saving…" : "Save outline to property"}</span>} />
+      <Row onClick={saveOutline} label={<span className="text-[#0071E3]">{savingOutline ? "Saving…" : "Save outline to property"}</span>} />
     </Section>}
     <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} /></div>
   </>;
 
   const filters = <>
-    <SheetHeader onBack={() => setFiltersOpen(false)} backLabel="Done" title="Filters" trailing={activeFilters > 0 ? <button type="button" className="mt-1 text-[15px] text-[#007AFF]" onClick={() => update(s => ({ layers: defaultState().layers, filters: { ...defaultState().filters, withinView: s.filters.withinView } }))}>Reset</button> : undefined} />
+    <SheetHeader onBack={() => setFiltersOpen(false)} backLabel="Done" title="Filters" trailing={activeFilters > 0 ? <button type="button" className="mt-1 text-[15px] text-[#0071E3]" onClick={() => update(s => ({ layers: defaultState().layers, filters: { ...defaultState().filters, withinView: s.filters.withinView } }))}>Reset</button> : undefined} />
     <Section title="Show on map" footer={<>Not connected yet: {UNAVAILABLE_LAYERS.map(u => u.label.toLowerCase()).join(", ")}.</>}>
-      {LAYERS.map(l => <Row key={l.key} leading={<Dot color={l.color} />} label={l.label} detail={`${all.filter(r => r.kind === l.key && r.coordinates).length} on map · ${all.filter(r => r.kind === l.key).length} saved`}>
+      {LAYERS.map(l => <Row key={l.key} leading={<EvidenceKey kind={l.key} />} label={l.label} detail={`${all.filter(r => r.kind === l.key && r.coordinates).length} on map · ${all.filter(r => r.kind === l.key).length} saved`}>
         <Switch label={l.label} checked={ws.layers[l.key] !== false} onChange={v => update(s => ({ layers: { ...s.layers, [l.key]: v } }))} /></Row>)}
     </Section>
     <Section title="Period">
@@ -342,37 +351,41 @@ function MapWorkspace() {
       onCamera={onCamera} onSelect={select} onGroup={setGroup} onMapClick={onMapClick} onSubjectMove={onSubjectMove} onAreaEdit={onAreaEdit} onStatus={onStatus} />}
 
     {/* The one card: sidebar on desktop, bottom sheet on phones. */}
-    <Glass role="complementary" aria-label="Mizan" className={`absolute z-[1000] flex flex-col overflow-hidden ${narrow ? `inset-x-0 bottom-0 rounded-t-[22px] ${sheetHeight} transition-[height] duration-200` : "left-3 top-3 bottom-3 w-[380px] rounded-[22px]"}`}>
+    <Glass role="complementary" aria-label="Mizan" className={`absolute z-[1000] flex flex-col overflow-hidden ${narrow ? `inset-x-0 bottom-0 rounded-t-[20px] ${sheetHeight} transition-[height] duration-200` : `left-4 top-4 w-[400px] rounded-[20px] ${view === "analysis" || view === "filters" || kindFocus || group.length ? "bottom-4" : "max-h-[calc(100%-32px)]"}`}`}>
       {narrow && <button type="button" aria-label={`Sheet ${sheet}; change size`} onClick={() => setSheet(s => s === "peek" ? "half" : s === "half" ? "full" : "peek")} className="mx-auto mt-2 h-[5px] w-10 shrink-0 rounded-full bg-black/20" />}
-      <div className="flex shrink-0 items-center gap-2 px-3 pt-3">
+      <div className="flex shrink-0 items-center gap-2 px-4 pt-4">
         <div className="relative">
           <button type="button" aria-label="Menu" aria-expanded={popover === "menu"} onClick={() => setPopover(p => p === "menu" ? "" : "menu")} className="grid h-9 w-9 place-items-center rounded-full bg-black/[0.05] text-black/70 active:bg-black/10"><Menu size={17} /></button>
           {popover === "menu" && <Glass className="absolute left-0 top-11 z-10 w-56 rounded-2xl p-1.5">
             <p className="px-3 py-1.5 text-[13px] font-semibold text-black/80">Mizan <span lang="ar" className="font-normal text-black/40">ميزان</span></p>
             {NAV.map(n => <Link key={n.href} href={n.href} className="block rounded-lg px-3 py-2 text-[15px] text-black/80 hover:bg-black/[0.05]">{n.label}</Link>)}</Glass>}
         </div>
-        <div className="flex-1 min-w-0"><MapSearch records={all} geocodingAvailable={!!caps?.geocoding} hasKey={!!status?.configured} onCoordinates={onCoordinates} onRecord={r => { setPlace(null); selectRecord(r); }} onPlace={onPlace} /></div>
+        <div className="min-w-0 flex-1"><Segmented label="Workspace" value="explore" onChange={v => { if (v === "monitor") router.push("/monitor"); }} options={[{ value: "explore", label: "Explore" }, { value: "monitor", label: "Monitor" }]} /></div>
+        {view === "explore" && <button type="button" onClick={() => setFiltersOpen(true)} className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.05] text-black/70 active:bg-black/10" aria-label="Filters">
+          <SlidersHorizontal size={17} />{activeFilters > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#0071E3] px-1 text-[10px] font-semibold text-white">{activeFilters}</span>}</button>}
       </div>
-      {caseId && <p className="mx-4 mt-2 rounded-lg bg-[#007AFF]/10 px-3 py-1.5 text-[12.5px] text-[#0059c9]">Showing one case. <Link href="/map" className="underline">Show everything</Link></p>}
-      {error && <p role="alert" className="mx-4 mt-2 rounded-lg bg-[#FF3B30]/10 px-3 py-1.5 text-[13px] text-[#c4271d]">{error}</p>}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-3">{content}</div>
+      <div className="shrink-0 px-4 pt-3"><MapSearch records={all} geocodingAvailable={!!caps?.geocoding} hasKey={!!status?.configured} onCoordinates={onCoordinates} onRecord={r => { setPlace(null); selectRecord(r); }} onPlace={onPlace} /></div>
+      {caseId && <p className="mx-4 mt-2 rounded-lg bg-[#0071E3]/10 px-3 py-1.5 text-[12.5px] text-[#0062C4]">Showing one case. <Link href="/map" className="underline">Show everything</Link></p>}
+      {error && <p role="alert" className="mx-4 mt-2 rounded-lg bg-[#FF3B30]/10 px-3 py-1.5 text-[13px] text-[#C0271B]">{error}</p>}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3">{content}</div>
     </Glass>
 
     {/* Map style + provider status (top right). */}
-    <div className="absolute right-3 top-3 z-[1001] flex flex-col items-end gap-2">
-      <Glass className="rounded-full"><button type="button" aria-label="Map style" aria-expanded={popover === "style"} onClick={() => setPopover(p => p === "style" ? "" : "style")} className="grid h-11 w-11 place-items-center text-black/75"><MapIcon size={19} /></button></Glass>
+    <div className="absolute right-4 top-4 z-[1001] flex flex-col items-end gap-2">
+      <div className="flex items-center gap-2">{data?.coverage?.demo_comparables ? <span className="inline-flex h-7 items-center rounded-full bg-black/[0.66] px-3 text-[12px] font-semibold text-white">DEMO DATA · fictional evidence</span> : null}
+      <Glass className="rounded-full"><button type="button" aria-label="Map style" aria-expanded={popover === "style"} onClick={() => setPopover(p => p === "style" ? "" : "style")} className="grid h-11 w-11 place-items-center text-black/75"><MapIcon size={19} /></button></Glass></div>
       {popover === "style" && <Glass className="max-h-[calc(100vh-90px)] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl p-3.5">
         <MapStylePanel basemap={status?.activeBasemap || ws.basemap} status={status} onChoose={b => { update({ basemap: b }); setPopover(""); }}
           onKeyChange={on => { setImageryVersion(v => v + 1); if (on) { update({ basemap: "satellite" }); setPopover(""); setNotice("Satellite is on."); } }} /></Glass>}
-      {status?.state === "error" && <Glass className="max-w-[260px] rounded-2xl px-3 py-2 text-[12.5px] text-[#c4271d]">{status.message}</Glass>}
+      {status?.state === "error" && <Glass className="max-w-[260px] rounded-2xl px-3 py-2 text-[12.5px] text-[#C0271B]">{status.message}</Glass>}
     </div>
 
     {/* Map controls (bottom right). */}
-    <div className={`absolute right-3 z-[1000] flex flex-col items-end gap-2 ${narrow ? (sheet === "full" ? "hidden" : sheet === "half" ? "bottom-[calc(52vh+12px)]" : "bottom-[212px]") : "bottom-8"}`}>
+    <div className={`absolute right-4 z-[1000] flex flex-col items-end gap-2 ${narrow ? (sheet === "full" ? "hidden" : sheet === "half" ? "bottom-[calc(52vh+12px)]" : "bottom-[212px]") : "bottom-6"}`}>
       {popover === "tools" && <Glass className="w-60 rounded-2xl p-1.5">
         {[{ t: "draw_area" as MapTool, icon: Hexagon, text: "Draw a search area" }, { t: "draw_site" as MapTool, icon: Square, text: "Trace the site outline" }, { t: "measure" as MapTool, icon: Ruler, text: "Measure distance" }].map(x =>
-          <button key={x.t} type="button" onClick={() => startTool(x.t)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-black/80 hover:bg-black/[0.05]"><x.icon size={17} className="text-[#007AFF]" />{x.text}</button>)}
-        <button type="button" onClick={radiusAroundSubject} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-black/80 hover:bg-black/[0.05]"><Circle size={17} className="text-[#007AFF]" />Radius around pin</button>
+          <button key={x.t} type="button" onClick={() => startTool(x.t)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-black/80 hover:bg-black/[0.05]"><x.icon size={17} className="text-[#0071E3]" />{x.text}</button>)}
+        <button type="button" onClick={radiusAroundSubject} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-black/80 hover:bg-black/[0.05]"><Circle size={17} className="text-[#0071E3]" />Radius around pin</button>
         {(ws.searchArea || ws.siteOutline || measure) && <div className="mt-1 border-t border-black/[0.06] pt-1">
           {ws.searchArea && <button type="button" onClick={() => { setEditArea(v => !v); setPopover(""); }} className="w-full rounded-lg px-3 py-2 text-left text-[14px] text-black/70 hover:bg-black/[0.05]">{editArea ? "Done editing area" : "Edit search area"}</button>}
           {ws.searchArea && <button type="button" onClick={() => { update({ searchArea: null, filterToArea: false }); setEditArea(false); setPopover(""); }} className="w-full rounded-lg px-3 py-2 text-left text-[14px] text-[#FF3B30] hover:bg-black/[0.05]">Remove search area</button>}
@@ -394,17 +407,17 @@ function MapWorkspace() {
 
     {/* Quiet status pill when there is no satellite imagery. */}
     {status?.provider === "osm" && !narrow && <button type="button" onClick={() => setPopover("style")} className="absolute left-[calc(50%+196px)] top-3 z-[999] -translate-x-1/2">
-      <Glass className="flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] text-black/60"><Layers size={14} />Standard map · <span className="text-[#007AFF]">Turn on satellite</span></Glass></button>}
+      <Glass className="flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] text-black/60"><Layers size={14} />Standard map · <span className="text-[#0071E3]">Turn on satellite</span></Glass></button>}
 
     {/* Drawing bar and toasts (bottom centre). */}
     {(draft || measure || tool === "place_subject") && <div className={`absolute left-1/2 z-[1001] -translate-x-1/2 ${narrow ? "top-3" : "bottom-8"}`} role="status" aria-live="polite">
       <Glass className="flex max-w-[92vw] flex-wrap items-center gap-x-3 gap-y-1 rounded-full px-4 py-2 text-[14px] text-black/80">
-        {tool === "place_subject" && <><span>Tap the map to drop the pin</span><button type="button" className="text-[#007AFF]" onClick={() => setTool("browse")}>Cancel</button></>}
+        {tool === "place_subject" && <><span>Tap the map to drop the pin</span><button type="button" className="text-[#0071E3]" onClick={() => setTool("browse")}>Cancel</button></>}
         {draft && <><span className="font-medium">{draft.tool === "measure" ? "Measure" : draft.tool === "draw_area" ? "Search area" : "Site outline"}</span>
           <span className="text-black/50">{draft.points.length} points{draftMeasure != null ? ` · ≈ ${draft.tool === "measure" ? formatDistance(draftMeasure) : formatArea(draftMeasure)}` : ""}</span>
-          <button type="button" className="text-[#007AFF]" onClick={addCentreVertex} title="Adds a point at the centre of the map (keyboard alternative)">Add centre</button>
-          <button type="button" className="text-[#007AFF] disabled:text-black/25" disabled={!draft.points.length} onClick={() => setDraft(d => d && { ...d, points: d.points.slice(0, -1) })}>Undo</button>
-          <button type="button" className="rounded-full bg-[#007AFF] px-3 py-1 font-medium text-white disabled:bg-black/15" disabled={draft.tool === "measure" ? draft.points.length < 2 : draft.points.length < 3} onClick={finishDraft}>Done</button>
+          <button type="button" className="text-[#0071E3]" onClick={addCentreVertex} title="Adds a point at the centre of the map (keyboard alternative)">Add centre</button>
+          <button type="button" className="text-[#0071E3] disabled:text-black/25" disabled={!draft.points.length} onClick={() => setDraft(d => d && { ...d, points: d.points.slice(0, -1) })}>Undo</button>
+          <button type="button" className="rounded-full bg-[#0071E3] px-3 py-1 font-medium text-white disabled:bg-black/15" disabled={draft.tool === "measure" ? draft.points.length < 2 : draft.points.length < 3} onClick={finishDraft}>Done</button>
           <button type="button" aria-label="Cancel drawing" className="text-black/40" onClick={() => { setDraft(null); setTool("browse"); }}><X size={16} /></button></>}
         {!draft && measure && tool !== "place_subject" && <><span>≈ {formatDistance(pathLengthMeters(measure))}</span><span className="text-black/40">approximate</span><button type="button" aria-label="Clear measurement" className="text-black/40" onClick={() => setMeasure(null)}><X size={16} /></button></>}
       </Glass></div>}
@@ -418,9 +431,20 @@ function MapWorkspace() {
   </div>;
 }
 
+function StepProgress({ step }: { step: number }) {
+  return <div className="px-4 pt-3" aria-label={`Step ${step} of 6`}>
+    <div className="flex items-center justify-end pb-1.5 text-[13px] text-[#5F5F64]">Step {step} of 6</div>
+    <div className="flex gap-1" aria-hidden>{[1, 2, 3, 4, 5, 6].map(i => <i key={i} className={`h-1 flex-1 rounded-sm ${i <= step ? "bg-[#0071E3]" : "bg-[rgba(60,60,67,0.34)]"}`} />)}</div>
+  </div>;
+}
+
+function OriginTag() {
+  return <span title="Includes synthetic demo records" className="inline-flex h-5 items-center rounded-[6px] border border-dashed border-[#8A5200] bg-[rgba(255,159,10,0.16)] px-[7px] text-[10.5px] font-semibold uppercase tracking-[0.05em] text-[#8A5200]">Demo data</span>;
+}
+
 function MapButton({ label, onClick, pressed, children }: { label: string; onClick: () => void; pressed?: boolean; children: React.ReactNode }) {
   return <button type="button" aria-label={label} title={label} aria-pressed={pressed} onClick={onClick}
-    className={`grid h-11 w-11 place-items-center ${pressed ? "text-[#007AFF]" : "text-black/70"} hover:bg-black/[0.04] active:bg-black/[0.08]`}>{children}</button>;
+    className={`grid h-11 w-11 place-items-center ${pressed ? "text-[#0071E3]" : "text-black/70"} hover:bg-black/[0.04] active:bg-black/[0.08]`}>{children}</button>;
 }
 
 export default function MapPage() { return <Suspense fallback={<div className="h-full bg-[#e8e6e1]" />}><MapWorkspace /></Suspense>; }

@@ -12,7 +12,7 @@ import { DEFAULT_CENTER, type Basemap } from "@/lib/map-workspace-state";
 import { arrowDelta, evidenceMarker, subjectMarker, vertexDot } from "./markers";
 import type { Capabilities, RendererHandle, RendererProps } from "./types";
 
-const icon = (html: HTMLElement, size = 34) => L.divIcon({ className: "mizan-leaflet-icon", html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+const icon = (html: HTMLElement, size = 36) => L.divIcon({ className: "mizan-leaflet-icon", html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 const OSM_CAPS: Capabilities = { satellite: false, hybrid: false, roadmap: true, terrain: false, geocoding: false };
 const NO_IMAGERY: ImageryStatus = { configured: false, provider: "osm", message: null, capabilities: OSM_CAPS, esri_streets: false, attribution: null };
 
@@ -78,7 +78,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     const p = live.current; group.clearLayers();
     const items = p.records.filter(r => r.coordinates).map(r => { const px = m.project(r.coordinates!, m.getZoom()); return { record: r, coordinates: r.coordinates as LatLng, x: px.x, y: px.y }; });
     for (const cluster of clusterProjected<MapRecord>(items)) {
-      const el = evidenceMarker(cluster, p.selectedId, p.groupIds, m.getZoom() >= 15);
+      const el = evidenceMarker(cluster, p.selectedId, p.groupIds, m.getZoom() >= 17);
       L.marker(cluster.center, { icon: icon(el), keyboard: false }).addTo(group);
       L.DomEvent.disableClickPropagation(el);
       el.addEventListener("click", () => {
@@ -90,7 +90,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
   function drawShapes() {
     const m = map.current; const group = layers.current.shapes; if (!m || !group) return;
     const p = live.current; group.clearLayers();
-    const area = p.searchArea; const style = { color: "#0A84FF", weight: 2, fillOpacity: 0.08 };
+    const area = p.searchArea; const style = { color: "#0071E3", weight: 2, fillOpacity: 0.08 };
     if (area?.kind === "radius") {
       const circle = L.circle(area.center, { ...style, radius: area.radius_m, dashArray: p.editArea ? undefined : "6 6" }).addTo(group);
       if (p.editArea) {
@@ -111,7 +111,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     if (p.siteOutline) L.polygon(p.siteOutline, { color: "#FF9F0A", weight: 2.5, fillOpacity: 0.15, interactive: false }).addTo(group);
     if (p.draft?.points.length) {
       L.polyline([...p.draft.points, ...(p.draft.tool !== "measure" && p.draft.points.length > 2 ? [p.draft.points[0]] : [])],
-        { color: p.draft.tool === "measure" ? "#ffffff" : "#0A84FF", weight: 2.5, dashArray: "4 6", interactive: false }).addTo(group);
+        { color: p.draft.tool === "measure" ? "#ffffff" : "#0071E3", weight: 2.5, dashArray: "4 6", interactive: false }).addTo(group);
       p.draft.points.forEach((pt, i) => L.marker(pt, { icon: icon(vertexDot(i, "Point"), 12), interactive: false }).addTo(group));
     }
     if (p.placeMarker) {
@@ -123,7 +123,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     const m = map.current; const group = layers.current.subject; if (!m || !group) return;
     const p = live.current; group.clearLayers(); if (!p.subject) return;
     const el = subjectMarker(p.subject, p.subjectDraggable);
-    const marker = L.marker(p.subject.coordinates, { icon: L.divIcon({ className: "mizan-leaflet-icon", html: el, iconSize: [34, 44], iconAnchor: [17, 43] }), draggable: p.subjectDraggable, keyboard: false, zIndexOffset: 1000 }).addTo(group);
+    const marker = L.marker(p.subject.coordinates, { icon: L.divIcon({ className: "mizan-leaflet-icon", html: el, iconSize: [28, 28], iconAnchor: [14, 14] }), draggable: p.subjectDraggable, keyboard: false, zIndexOffset: 1000 }).addTo(group);
     L.DomEvent.disableClickPropagation(el);
     marker.on("dragend", () => { const q = marker.getLatLng(); live.current.onSubjectMove([q.lat, q.lng]); });
     if (p.subjectDraggable) el.addEventListener("keydown", e => { const d = arrowDelta(e); if (!d) return; e.preventDefault();

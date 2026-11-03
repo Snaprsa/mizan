@@ -5,9 +5,9 @@ export type EvidenceKind = MapRecord["kind"];
 export type LayerDef = { key: EvidenceKind; label: string; short: string; color: string; glyph: string; description: string };
 
 export const LAYERS: LayerDef[] = [
-  { key: "property", label: "Subject & saved properties", short: "Properties", color: "#007AFF", glyph: "P", description: "Properties saved in Mizan, including valuation subjects." },
-  { key: "transaction", label: "Achieved sales", short: "Sales", color: "#34C759", glyph: "T", description: "Recorded transaction type, achieved price and transaction date." },
-  { key: "listing", label: "Asking listings", short: "Listings", color: "#FF9500", glyph: "L", description: "Asking prices. Not achieved sales." },
+  { key: "property", label: "Subject & saved properties", short: "Properties", color: "#0071E3", glyph: "P", description: "Properties saved in Mizan, including valuation subjects." },
+  { key: "transaction", label: "Achieved sales", short: "Sales", color: "#1D1D1F", glyph: "T", description: "Recorded transaction type, achieved price and transaction date." },
+  { key: "listing", label: "Asking listings", short: "Listings", color: "#1D1D1F", glyph: "L", description: "Asking prices. Not achieved sales." },
   { key: "other", label: "Other comparables", short: "Other", color: "#8E8E93", glyph: "?", description: "Comparables without a confirmed sale or listing classification." },
   { key: "market", label: "Market observations", short: "Market", color: "#AF52DE", glyph: "M", description: "Registered source observations with exact locations; area-level values stay in the list." },
 ];

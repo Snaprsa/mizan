@@ -27,19 +27,20 @@ export default function AssetPage() {
       rows.set(s.valued_on, row); }
     return Array.from(rows.values()).sort((x, y) => x.date.localeCompare(y.date));
   }, [a]);
-  if (error && !a) return <p className="rounded-xl bg-[#FF3B30]/10 px-4 py-3 text-[14px] text-[#c4271d]">{error}</p>;
+  if (error && !a) return <p className="rounded-xl bg-[#FF3B30]/10 px-4 py-3 text-[14px] text-[#C0271B]">{error}</p>;
   if (!a) return <p className="py-16 text-center text-[14px] text-black/40">Loading…</p>;
   const s = a.summary; const asOf = today();
   const attribution = window_ === "official" && a.attribution_since_official ? a.attribution_since_official : a.attribution;
   const onAlert = (x: Alert, status: Alert["status"]) => run(async () => { await setAlertStatus(x.id, status, status === "accepted" ? "Reviewed on the asset page" : undefined); });
-  const openAlerts = a.alerts.filter(x => x.status !== "resolved");
+  const RANK = { critical: 3, warning: 2, watch: 1, info: 0 };
+  const openAlerts = a.alerts.filter(x => x.status !== "resolved").sort((x, y) => RANK[y.severity] - RANK[x.severity]);
   return <div>
-    <Link href={`/monitor/${a.portfolio.id}`} className="-ml-1.5 mb-2 inline-flex items-center text-[14px] text-[#007AFF]" dir="auto"><ChevronLeft size={18} />{a.portfolio.name}</Link>
+    <Link href={`/monitor/${a.portfolio.id}`} className="-ml-1.5 mb-2 inline-flex items-center text-[14px] text-[#0071E3]" dir="auto"><ChevronLeft size={18} />{a.portfolio.name}</Link>
     <h1 className="text-[26px] font-semibold leading-tight tracking-tight" dir="auto">{a.name}</h1>
     <p className="mb-4 text-[13px] text-black/45">{[a.district, a.city, titleCase(a.property_type)].filter(Boolean).join(" · ")}{a.ownership_pct !== 100 ? ` · ${a.ownership_pct}% owned` : ""}</p>
     {a.is_demo && <DemoBanner />}
-    {notice && <p className="mb-4 rounded-xl bg-[#007AFF]/10 px-4 py-2.5 text-[13px] text-[#0058b8]">{notice}</p>}
-    {error && <p className="mb-4 rounded-xl bg-[#FF3B30]/10 px-4 py-2.5 text-[13px] text-[#c4271d]">{error}</p>}
+    {notice && <p className="mb-4 rounded-xl bg-[#0071E3]/10 px-4 py-2.5 text-[13px] text-[#0062C4]">{notice}</p>}
+    {error && <p className="mb-4 rounded-xl bg-[#FF3B30]/10 px-4 py-2.5 text-[13px] text-[#C0271B]">{error}</p>}
 
     <section className="mb-5 rounded-2xl bg-white p-5 ring-1 ring-black/[0.05]">
       <div className="flex items-center gap-2 text-[13px] text-black/50">Current Mizan value <OriginBadge origin={a.origin} /></div>
@@ -86,7 +87,7 @@ export default function AssetPage() {
 
     {a.evidence.length > 0 && <Card title={`Comparable sales · ${a.evidence.length}`} footer="Eligible sales behind the latest value. New means it arrived since the official valuation.">
       <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-[13.5px]"><thead><tr className="text-left text-[12px] text-black/45"><th className="py-1 font-medium">Sale</th><th className="py-1 font-medium">Date</th><th className="py-1 text-right font-medium">SAR/m²</th><th className="py-1 text-right font-medium">vs this asset</th><th className="py-1 text-right font-medium">Source</th></tr></thead>
-        <tbody className="divide-y divide-black/[0.05]">{a.evidence.map(c => <tr key={c.id}><td className="max-w-[230px] truncate py-1.5" dir="auto">{c.title}{c.is_new && <span className="ml-2 rounded bg-[#007AFF]/10 px-1.5 py-[1px] text-[10.5px] font-semibold text-[#0058b8]">NEW</span>}</td><td className="whitespace-nowrap py-1.5 text-black/55">{c.date}</td><td className="py-1.5 text-right tabular-nums">{Math.round(c.price_per_sqm).toLocaleString("en-SA")}</td><td className="py-1.5 text-right tabular-nums"><Movement value={c.vs_implied_pct}>{pct(c.vs_implied_pct)}</Movement></td><td className="py-1.5 text-right"><OriginBadge origin={c.origin} /></td></tr>)}</tbody></table></div></Card>}
+        <tbody className="divide-y divide-black/[0.05]">{a.evidence.map(c => <tr key={c.id}><td className="max-w-[230px] truncate py-1.5" dir="auto">{c.title}{c.is_new && <span className="ml-2 rounded bg-[#0071E3]/10 px-1.5 py-[1px] text-[10.5px] font-semibold text-[#0062C4]">NEW</span>}</td><td className="whitespace-nowrap py-1.5 text-black/55">{c.date}</td><td className="py-1.5 text-right tabular-nums">{Math.round(c.price_per_sqm).toLocaleString("en-SA")}</td><td className="py-1.5 text-right tabular-nums"><Movement value={c.vs_implied_pct}>{pct(c.vs_implied_pct)}</Movement></td><td className="py-1.5 text-right"><OriginBadge origin={c.origin} /></td></tr>)}</tbody></table></div></Card>}
 
     {a.methods.length > 0 && <Card title="Assumptions" footer="An override keeps the reviewed value, and records who changed it, when and why. It takes effect straight away as a new valuation.">
       <Inputs methods={a.methods} asOf={asOf} editing={editing} setEditing={setEditing} busy={busy} onSave={(field, value, reason) => run(() => overrideInput(a.id, { field, value, reason }), "Assumption changed. Why it changed is now in the audit trail.")} /></Card>}
@@ -104,7 +105,7 @@ export default function AssetPage() {
 }
 
 function GradeCard({ grade }: { grade: GradeDetail }) {
-  const color: Record<string, string> = { good: "text-[#1c7a3a]", fair: "text-[#a85f00]", poor: "text-[#c4271d]" };
+  const color: Record<string, string> = { good: "text-[#17722F]", fair: "text-[#a85f00]", poor: "text-[#C0271B]" };
   return <Card title="Why this confidence" footer={grade.basis}><ul className="m-0 list-none space-y-1.5 p-0 text-[13.5px]">{grade.checks.map(c => <li key={c.key} className="flex items-baseline justify-between gap-3"><span className="text-black/60">{c.label}<span className="block text-[12px] text-black/40">{c.detail}</span></span><span className={`font-medium capitalize ${color[c.state] ?? ""}`}>{c.state}</span></li>)}</ul></Card>;
 }
 
@@ -117,12 +118,12 @@ function Inputs({ methods, asOf, editing, setEditing, busy, onSave }: { methods:
   const main = all.filter(i => KEY.includes(i.key) || i.override || i.key === editing).sort((x, y) => (KEY.indexOf(x.key) + 99) % 99 - (KEY.indexOf(y.key) + 99) % 99).slice(0, Math.max(5, all.filter(i => i.override || i.key === editing).length));
   const list = showAll ? all : main;
   return <><ul className="m-0 list-none divide-y divide-black/[0.05] p-0">{list.map(i => <li key={i.key} className="py-2">
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3"><span className="text-[14px] text-black/75">{i.label}{i.override && <span className="ml-2 rounded bg-[#007AFF]/10 px-1.5 py-[1px] text-[10.5px] font-semibold text-[#0058b8]">OVERRIDDEN</span>}</span>
-      <span className="flex items-baseline gap-3"><span className="tabular-nums text-[14px] font-medium">{showInput(i)}</span><button type="button" className="text-[13px] text-[#007AFF]" onClick={() => setEditing(editing === i.key ? null : i.key)}>Adjust</button></span></div>
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3"><span className="text-[14px] text-black/75">{i.label}{i.override && <span className="ml-2 rounded bg-[#0071E3]/10 px-1.5 py-[1px] text-[10.5px] font-semibold text-[#0062C4]">OVERRIDDEN</span>}</span>
+      <span className="flex items-baseline gap-3"><span className="tabular-nums text-[14px] font-medium">{showInput(i)}</span><button type="button" className="text-[13px] text-[#0071E3]" onClick={() => setEditing(editing === i.key ? null : i.key)}>Adjust</button></span></div>
     <div className="text-[12px] text-black/45" dir="auto">{i.source ?? "No source"} · {ageLabel(i.as_of, asOf)} · {titleCase(i.status)}</div>
     {editing === i.key && <OverrideForm input={i} busy={busy} onSubmit={(v, r) => onSave(i.key, v, r)} />}
   </li>)}</ul>
-  {all.length > main.length && <button type="button" className="mt-2 text-[13px] text-[#007AFF]" onClick={() => setShowAll(v => !v)}>{showAll ? "Show fewer" : `Show all ${all.length}`}</button>}</>;
+  {all.length > main.length && <button type="button" className="mt-2 text-[13px] text-[#0071E3]" onClick={() => setShowAll(v => !v)}>{showAll ? "Show fewer" : `Show all ${all.length}`}</button>}</>;
 }
 
 function OverrideForm({ input, busy, onSubmit }: { input: InputMeta; busy: boolean; onSubmit: (value: number | null, reason: string) => void }) {
@@ -154,7 +155,7 @@ function EventForm({ busy, onSubmit }: { busy: boolean; onSubmit: (b: { event_ty
 
 function WeightsForm({ methods, current, busy, onSubmit }: { methods: AssetDetail["methods"]; current: Record<string, number> | null; busy: boolean; onSubmit: (w: Record<string, number> | null) => void }) {
   const [open, setOpen] = useState(false);
-  if (!open) return <button type="button" className="mt-2 text-[13px] text-[#007AFF]" onClick={() => setOpen(true)}>{current ? "Change weights" : "Set weights"}</button>;
+  if (!open) return <button type="button" className="mt-2 text-[13px] text-[#0071E3]" onClick={() => setOpen(true)}>{current ? "Change weights" : "Set weights"}</button>;
   return <form onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); onSubmit(Object.fromEntries(methods.map(m => [m.key, Number(f.get(m.key))]))); }} className="mt-3 grid gap-2 rounded-xl bg-black/[0.03] p-3 sm:grid-cols-4 sm:items-end">
     {methods.map(m => <Field key={m.key} label={`${m.label} (relative)`}><input name={m.key} type="number" min="0.01" step="any" required defaultValue={current?.[m.key] ?? 1} className={inputClass} /></Field>)}
     <div className="flex gap-1.5 sm:col-span-4"><Button type="submit" tone="primary" disabled={busy}>Apply weights</Button>{current && <Button disabled={busy} onClick={() => onSubmit(null)}>Back to median</Button>}</div></form>;
@@ -180,7 +181,7 @@ function Timeline({ a }: { a: AssetDetail }) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const show = () => getAudit(a.id).then(r => setEntries(r.entries));
   return <Card title="Audit trail" footer={entries ? "Newest first. Snapshots are immutable: a change always adds a record." : undefined}>
-    {entries === null ? <button type="button" className="text-[14px] text-[#007AFF]" onClick={show}>Show every valuation, trigger and action</button> :
+    {entries === null ? <button type="button" className="text-[14px] text-[#0071E3]" onClick={show}>Show every valuation, trigger and action</button> :
       <ol className="m-0 max-h-[520px] list-none space-y-2 overflow-y-auto p-0">{entries.map((e, i) => <li key={i} className="grid grid-cols-[86px_1fr] gap-3 text-[13.5px]"><time className="tabular-nums text-black/45">{e.on}</time><div><span className={e.kind === "valuation" || e.kind === "official" ? "font-medium text-black/85" : "text-black/70"} dir="auto">{e.text}{e.after != null && <> {e.before != null ? `${sar(e.before)} → ` : ""}{sar(e.after)}</>}</span>
         {e.kind === "valuation" && <span className="block text-[12px] text-black/45">{triggerLabel(e.trigger)} · {e.model} · {e.calculation_version}</span>}
         {e.details?.reason && <span className="block text-[12px] text-black/45" dir="auto">Reason: {e.details.reason}{e.details.changes ? ` · ${e.details.changes.map((c: { label: string; before: number; after: number }) => `${c.label} ${c.before} → ${c.after}`).join(", ")}` : ""}</span>}</div></li>)}</ol>}

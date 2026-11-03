@@ -6,6 +6,7 @@ import { MapPin, Search, X } from "lucide-react";
 import type { MapRecord } from "@/lib/api";
 import { parseCoordinates, type LatLng } from "@/lib/geo";
 import { LAYER } from "@/lib/map-evidence";
+import EvidenceKey from "./evidence-key";
 import { geocodePlaces, type PlaceResult } from "@/lib/map-provider";
 
 type Props = { records: MapRecord[]; geocodingAvailable: boolean; hasKey: boolean;
@@ -37,7 +38,7 @@ export default function MapSearch({ records, geocodingAvailable, hasKey, onCoord
   const empty = !coords && !matches.length && !places?.length;
   return <div ref={root} className="relative" onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}>
     <label className="sr-only" htmlFor="map-search">Search coordinates, address or saved records</label>
-    <div className="flex h-9 items-center rounded-[10px] bg-black/[0.06] focus-within:bg-black/[0.08]">
+    <div className="flex h-11 items-center rounded-[12px] bg-[rgba(120,120,128,0.12)] focus-within:bg-[rgba(120,120,128,0.18)]">
       <Search size={16} className="ml-2.5 mr-1.5 shrink-0 text-black/40" aria-hidden />
       <input id="map-search" value={q} onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
         onKeyDown={e => { if (e.key === "Enter" && coords?.ok) { onCoordinates(coords.value); done(); } }}
@@ -48,21 +49,21 @@ export default function MapSearch({ records, geocodingAvailable, hasKey, onCoord
     </div>
     {open && q.trim() && <div id="map-search-results" className="absolute z-[1200] mt-2 w-full overflow-hidden rounded-2xl bg-white/95 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] ring-1 ring-black/[0.06] backdrop-blur-xl">
       {coords?.ok && <Result onClick={() => { onCoordinates(coords.value); done(); }} title={coords.value.map(n => n.toFixed(6)).join(", ")} detail={`Drop pin here · latitude, longitude${coords.warning ? ` · ${coords.warning}` : ""}`} />}
-      {coords && !coords.ok && <div className="px-4 py-3 text-[13px] text-[#c4271d]">{coords.error}
-        {coords.swapped && <button type="button" className="mt-1 block text-[#007AFF]" onClick={() => { onCoordinates(coords.swapped!); done(); }}>Use {coords.swapped.map(n => n.toFixed(6)).join(", ")} instead</button>}</div>}
-      {matches.map(r => <Result key={r.id} onClick={() => { onRecord(r); done(); }} dot={LAYER[r.kind].color} title={r.title} detail={`${LAYER[r.kind].short}${r.coordinates ? "" : " · no location"}`} />)}
+      {coords && !coords.ok && <div className="px-4 py-3 text-[13px] text-[#C0271B]">{coords.error}
+        {coords.swapped && <button type="button" className="mt-1 block text-[#0071E3]" onClick={() => { onCoordinates(coords.swapped!); done(); }}>Use {coords.swapped.map(n => n.toFixed(6)).join(", ")} instead</button>}</div>}
+      {matches.map(r => <Result key={r.id} onClick={() => { onRecord(r); done(); }} kind={r.kind} title={r.title} detail={`${LAYER[r.kind].short}${r.coordinates ? "" : " · no location"}`} />)}
       {places?.map((p, i) => <Result key={i} onClick={() => { onPlace(p.coordinates); done(); }} title={p.label} detail={`${p.precision.replace(/([a-z])([A-Z])/g, "$1 $2")} · moves the map — then tap to drop the pin`} />)}
       {busy && <p className="px-4 py-3 text-[13px] text-black/45">Searching…</p>}
-      {error && <p className="px-4 py-3 text-[13px] text-[#c4271d]">{error}</p>}
+      {error && <p className="px-4 py-3 text-[13px] text-[#C0271B]">{error}</p>}
       {!busy && empty && !error && <p className="px-4 py-3 text-[13px] text-black/45">{coords ? "" : !hasKey ? "Turn on satellite to search addresses. For now, type coordinates like 24.7136, 46.6753." : term.length < 3 ? "Keep typing…" : "No matches."}</p>}
       {plotLike && <p className="border-t border-black/[0.06] px-4 py-2.5 text-[12px] text-black/45">Plot and plan numbers can’t be looked up yet — no authorised cadastral source is connected.</p>}
     </div>}
   </div>;
 }
 
-function Result({ title, detail, onClick, dot }: { title: string; detail: string; onClick: () => void; dot?: string }) {
+function Result({ title, detail, onClick, kind }: { title: string; detail: string; onClick: () => void; kind?: MapRecord["kind"] }) {
   return <button type="button" onClick={onClick} className="flex w-full items-start gap-3 border-b border-black/[0.05] px-4 py-2.5 text-left last:border-0 hover:bg-black/[0.03]">
-    {dot ? <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dot }} /> : <MapPin size={16} className="mt-0.5 shrink-0 text-[#FF3B30]" />}
+    {kind ? <span className="mt-1"><EvidenceKey kind={kind} /></span> : <MapPin size={16} className="mt-0.5 shrink-0 text-[#FF3B30]" />}
     <span className="min-w-0"><span className="block truncate text-[15px] text-black/85" dir="auto">{title}</span><span className="block text-[12.5px] text-black/45">{detail}</span></span>
   </button>;
 }

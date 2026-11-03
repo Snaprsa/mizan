@@ -124,7 +124,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
         {f.unit === "ratio" && <p className="text-[10px] text-slate-400">Use 0.08 for 8%. Enter 0 explicitly where applicable.</p>}
         {/* Provenance is always recorded; it opens by itself when something is missing. */}
         <details open={f.value != null && (!f.source || !f.as_of) ? true : undefined}>
-          <summary className="mizan-summary cursor-pointer text-[12px] text-black/45">Source: <span className="text-black/65">{draft[f.key]?.source?.trim() || "added when you enter a value"}</span>{draft[f.key]?.as_of ? ` · ${draft[f.key].as_of}` : ""} <span className="text-[#007AFF]">Edit</span></summary>
+          <summary className="mizan-summary cursor-pointer text-[12px] text-black/45">Source: <span className="text-black/65">{draft[f.key]?.source?.trim() || "added when you enter a value"}</span>{draft[f.key]?.as_of ? ` · ${draft[f.key].as_of}` : ""} <span className="text-[#0071E3]">Edit</span></summary>
           <div className="mt-2 space-y-2">
             <label className="mizan-label">Source for {f.label}<input className="mizan-input !text-xs" value={draft[f.key]?.source ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], source: e.target.value } }); setError(""); }} placeholder="Source / user assumption" /></label>
             <label className="mizan-label">Source date for {f.label}<input className="mizan-input" type="date" value={draft[f.key]?.as_of ?? ""} onChange={e => { setDraft({ ...draft, [f.key]: { ...draft[f.key], as_of: e.target.value } }); setError(""); }} /></label>
@@ -134,7 +134,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
       </div>)}
       <p className="text-[11.5px] text-black/40">A value you type is recorded as your own assumption.</p>
     </section>}
-    {!automatic && <button type="button" disabled={busy || !complete} className="w-full rounded-xl bg-[#007AFF] px-4 py-3 text-[16px] font-semibold text-white active:opacity-80 disabled:bg-black/10 disabled:text-black/35" onClick={() => perform(true)}>{busy ? "Calculating…" : "Calculate"}</button>}
+    {!automatic && <button type="button" disabled={busy || !complete} className="w-full rounded-xl bg-[#0071E3] px-4 py-3 text-[16px] font-semibold text-white active:opacity-80 disabled:bg-black/10 disabled:text-black/35" onClick={() => perform(true)}>{busy ? "Calculating…" : "Calculate"}</button>}
     {notice && <p role="status" className="px-1 text-[12.5px] text-[#248a3d]">{notice}</p>}
 
     {/* Everything else is one tap away. */}
@@ -144,7 +144,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
       <Disclosure title="Evidence used" detail={method === "sales_comparison" ? `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable` : `${prepared.candidates.length} nearby`} defaultOpen={method === "sales_comparison" && !grid}>
         <p className="text-[12.5px] text-black/50">Within {prepared.radius_km} km. Listings and draft, undated or repeated records are not used as achieved sales.</p>
         <div className="mt-2 max-h-56 divide-y divide-black/[0.05] overflow-auto">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block w-full py-1.5 text-left" onClick={() => onSelectEvidence(c.id)}><span className="block truncate text-[14px] text-black/80" dir="auto">{c.title}</span><span className={`block text-[12px] ${c.eligible ? "text-[#248a3d]" : "text-black/45"}`}>{c.distance_km} km · {c.eligible ? "Used" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="py-2 text-[13px] text-black/45">No located evidence within this radius.</p>}</div>
-        <button type="button" className="mt-2 text-[13px] text-[#007AFF] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
+        <button type="button" className="mt-2 text-[13px] text-[#0071E3] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
       </Disclosure>
       {result && <Disclosure title="How this was calculated">
         <ul className="list-disc space-y-1 pl-4 text-[12.5px] text-black/55">{result.outputs.limitations.map(l => <li key={l}>{l}</li>)}</ul>
@@ -152,7 +152,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
         <details className="mt-2"><summary className="cursor-pointer text-[12.5px] text-black/45">Technical details</summary><pre className="mt-1 max-h-52 overflow-auto rounded-lg bg-black/[0.03] p-2 text-[11px]">{JSON.stringify(result.outputs.evidence, null, 2)}</pre></details>
       </Disclosure>}
       {!!runs.length && <Disclosure title="Saved calculations" detail={String(runs.length)}>
-        <ul className="divide-y divide-black/[0.05]">{runs.map(r => <li key={r.id}><button type="button" className="w-full py-1.5 text-left text-[13.5px] text-[#007AFF]" onClick={() => setResult({ ...r.data, id: r.id, created_at: r.created_at })}>{new Date(r.created_at).toLocaleString()}<span className="block text-[12px] text-black/45">{methods.find(m => m.key === r.data.method)?.label || r.data.method} · {money(r.data.outputs.value)} · revision {r.data.property_revision}</span></button></li>)}</ul>
+        <ul className="divide-y divide-black/[0.05]">{runs.map(r => <li key={r.id}><button type="button" className="w-full py-1.5 text-left text-[13.5px] text-[#0071E3]" onClick={() => setResult({ ...r.data, id: r.id, created_at: r.created_at })}>{new Date(r.created_at).toLocaleString()}<span className="block text-[12px] text-black/45">{methods.find(m => m.key === r.data.method)?.label || r.data.method} · {money(r.data.outputs.value)} · revision {r.data.property_revision}</span></button></li>)}</ul>
       </Disclosure>}
       <Disclosure title="Settings" detail={`${asOf} · ${radius} km`}>
         <div className="space-y-2.5">
@@ -160,9 +160,9 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
           <p className="text-[12px] text-black/45">{prepared.description}</p>
           <div className="grid grid-cols-2 gap-2"><label className="mizan-label">Valuation date<input className="mizan-input" type="date" value={asOf} onChange={e => { setAsOf(e.target.value); setError(""); }} /></label><label className="mizan-label">Evidence radius (km)<input className="mizan-input" type="number" min="0.1" max="50" step="0.1" value={radius} onChange={e => { setRadius(e.target.value); setError(""); }} /></label><label className="mizan-label col-span-2">Look back (days)<input className="mizan-input" type="number" min="1" max="3650" value={lookback} onChange={e => { setLookback(e.target.value); setError(""); }} /></label></div>
           <label className="flex items-center gap-2 text-[13.5px] text-black/70"><input type="checkbox" checked={automatic} onChange={e => setAutomatic(e.target.checked)} />Calculate automatically</label>
-          <button type="button" disabled={busy} className="block text-[13.5px] text-[#007AFF] disabled:opacity-40" onClick={() => perform(false)}>Save without calculating</button>
+          <button type="button" disabled={busy} className="block text-[13.5px] text-[#0071E3] disabled:opacity-40" onClick={() => perform(false)}>Save without calculating</button>
           <p className="text-[11.5px] text-black/40">Revision {prepared.revision}</p>
-          <Link href={`/properties/${propertyId}`} className="block text-[13.5px] text-[#007AFF]">Open full property details</Link>
+          <Link href={`/properties/${propertyId}`} className="block text-[13.5px] text-[#0071E3]">Open full property details</Link>
         </div>
       </Disclosure>
     </div>
@@ -189,8 +189,8 @@ function SubjectDetails({ propertyId, factors, attributes, propertyType, onSaved
     <h3 className="text-[15px] font-semibold text-black/85">About this {propertyType.replaceAll("_", " ")}</h3>
     <div className="mt-2 space-y-2">{editable.map(f => <div key={f} className="flex items-center justify-between gap-2 text-[14px] text-black/70"><span>{labels[f]}</span><AttributeInput factor={f} value={draft as ComparableAttributes} onChange={p => setDraft(d => ({ ...d, ...p }))} /></div>)}</div>
     {factors.includes("grade") && draft.grade && <p className="mt-2 text-[11.5px] text-black/45">Recorded as an assumed grade, not a certified one.</p>}
-    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[14px] font-medium text-[#007AFF] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
-    {error && <p role="alert" className="mt-1 text-[12.5px] text-[#c4271d]">{error}</p>}
+    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[14px] font-medium text-[#0071E3] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
+    {error && <p role="alert" className="mt-1 text-[12.5px] text-[#C0271B]">{error}</p>}
   </section>;
 }
 
