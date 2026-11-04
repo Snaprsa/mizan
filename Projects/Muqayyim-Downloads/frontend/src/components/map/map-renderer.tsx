@@ -109,7 +109,15 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
       });
     }
     if (p.footprint) L.polygon(p.footprint, { color: "#0071E3", weight: 2.5, dashArray: "6 5", fillColor: "#0071E3", fillOpacity: 0.12, interactive: false }).addTo(group);
-    if (p.siteOutline) L.polygon(p.siteOutline, { color: "#FF9F0A", weight: 2.5, fillOpacity: 0.15, interactive: false }).addTo(group);
+    if (p.siteOutline) {
+      const outline = L.polygon(p.siteOutline, { color: "#FF9F0A", weight: 2.5, fillOpacity: 0.15, interactive: false }).addTo(group);
+      if (p.editOutline) p.siteOutline.forEach((pt, i) => {
+        const handle = L.marker(pt, { draggable: true, icon: icon(vertexDot(i, "Outline corner"), 16), title: `Corner ${i + 1} · drag to edit` }).addTo(group);
+        const moved = () => { const ring = p.siteOutline!.slice(); const q = handle.getLatLng(); ring[i] = [q.lat, q.lng]; return ring; };
+        handle.on("drag", () => outline.setLatLngs(moved()));
+        handle.on("dragend", () => live.current.onOutlineEdit(moved()));
+      });
+    }
     if (p.draft?.points.length) {
       L.polyline([...p.draft.points, ...(p.draft.tool !== "measure" && p.draft.points.length > 2 ? [p.draft.points[0]] : [])],
         { color: p.draft.tool === "measure" ? "#ffffff" : "#0071E3", weight: 2.5, dashArray: "4 6", interactive: false }).addTo(group);
@@ -147,7 +155,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
 
   useEffect(() => { drawTiles(); }, [props.basemap]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { drawEvidence(); }, [props.records, props.selectedId, props.groupIds]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { drawShapes(); }, [props.searchArea, props.editArea, props.siteOutline, props.footprint, props.draft, props.placeMarker]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { drawShapes(); }, [props.searchArea, props.editArea, props.siteOutline, props.editOutline, props.footprint, props.draft, props.placeMarker]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { drawSubject(); }, [props.subject, props.subjectDraggable]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const m = map.current; if (!m) return; m.getContainer().style.cursor = props.tool === "browse" ? "" : "crosshair";
     if (props.tool === "browse") m.doubleClickZoom.enable(); else m.doubleClickZoom.disable(); }, [props.tool]);

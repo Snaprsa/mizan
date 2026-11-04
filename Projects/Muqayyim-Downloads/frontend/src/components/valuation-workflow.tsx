@@ -9,6 +9,8 @@ import AdjustmentGrid, { AttributeInput } from "./adjustment-grid";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
+/** Sources written by a map measurement start with this, so a newer measurement may replace them; anything typed by a person may not. */
+export const MAP_SOURCE = "Map · ";
 export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0, areaSuggestion = null }: {
   propertyId: string; methods: ValuationMethod[]; onPrepared: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void;
   /** An area measured or estimated on the map, with its source. It only fills an empty area field. */
@@ -42,7 +44,10 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
     setDraft(d => { const next = { ...d }; let changed = false;
       for (const key of ["area_sqm", "building_area"]) {
         const field = prepared.fields.find(f => f.key === key);
-        if (field && next[key] && next[key].value === "" && next[key].source === "") { next[key] = { value: String(areaSuggestion.value), source: areaSuggestion.source, as_of: areaSuggestion.as_of }; changed = true; }
+        const current = next[key];
+        const replaceable = current && ((current.value === "" && current.source === "") || current.source.startsWith(MAP_SOURCE));
+        if (field && replaceable && (current.value !== String(areaSuggestion.value) || current.source !== areaSuggestion.source)) {
+          next[key] = { value: String(areaSuggestion.value), source: areaSuggestion.source, as_of: areaSuggestion.as_of }; changed = true; }
       }
       return changed ? next : d; });
   }, [areaSuggestion, prepared]);
@@ -128,8 +133,11 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
           const previous = draft[f.key] || { value: "", source: "", as_of: "" };
           const raw = e.target.value; const isOriginal = raw !== "" && f.value != null && Number(raw) === f.value;
           const changesSourcedValue = raw !== "" && f.value != null && !isOriginal && (previous.source === f.source || previous.source.startsWith("User override of:"));
-          const source = isOriginal ? f.source || previous.source : changesSourcedValue ? `User override of: ${f.source || "saved value"}` : previous.source || "User input · valuation assumption";
-          const date = isOriginal ? f.as_of || previous.as_of : changesSourcedValue ? asOf : previous.as_of || asOf;
+          const fromMap = previous.source.startsWith(MAP_SOURCE) && !isOriginal;
+          const replaced = f.source || previous.source || "saved value";
+          const source = isOriginal ? f.source || previous.source : changesSourcedValue || fromMap
+            ? (replaced.startsWith(MAP_SOURCE) ? `Entered by you, replacing ${replaced.slice(MAP_SOURCE.length)}` : `User override of: ${replaced}`) : previous.source || "User input · valuation assumption";
+          const date = isOriginal ? f.as_of || previous.as_of : changesSourcedValue || fromMap ? asOf : previous.as_of || asOf;
           setDraft({ ...draft, [f.key]: { value: raw, source, as_of: date } }); setError("");
         }} /></label>
         {f.unit === "ratio" && <p className="text-[10px] text-slate-400">Use 0.08 for 8%. Enter 0 explicitly where applicable.</p>}

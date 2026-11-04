@@ -22,13 +22,14 @@ export type RendererProps = {
   searchArea: SearchArea | null; editArea: boolean; siteOutline: LatLng[] | null;
   /** A building outline found under the pin, shown before the user adopts it. */
   footprint: LatLng[] | null;
+  editOutline: boolean;
   /** Temporary search-result marker; never a subject or evidence. */
   placeMarker: LatLng | null;
   tool: MapTool; draft: Draft;
   onCamera: (camera: Camera, bounds: MapBounds) => void;
   onSelect: (id: string) => void; onGroup: (ids: string[]) => void;
   onMapClick: (point: LatLng) => void; onSubjectMove: (point: LatLng) => void;
-  onAreaEdit: (area: SearchArea) => void; onStatus: (status: MapStatus) => void;
+  onAreaEdit: (area: SearchArea) => void; onOutlineEdit: (ring: LatLng[]) => void; onStatus: (status: MapStatus) => void;
 };
 export type RendererHandle = {
   fit: (points: LatLng[], maxZoom?: number) => void;
