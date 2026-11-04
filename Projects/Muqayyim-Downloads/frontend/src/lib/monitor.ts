@@ -94,4 +94,9 @@ export function assetsCsv(rows: AssetRow[]): string {
   const body = rows.map(r => [r.name, r.city, r.property_type, r.ownership_pct, r.value, r.low, r.high, r.official_value, r.official_on, r.change_vs_official_pct?.toFixed(2), r.confidence, r.divergence_pct?.toFixed(1), r.ltv_pct?.toFixed(1), r.priority.band, r.origin].map(quote).join(","));
   return [header.map(quote).join(","), ...body].join("\n");
 }
-export const errorText = (e: unknown) => { const raw = (e as Error)?.message ?? "Something went wrong"; try { const d = JSON.parse(raw).detail; return typeof d === "string" ? d : Array.isArray(d) ? d.map((x: { msg: string }) => x.msg).join("; ") : d?.message ?? raw; } catch { return raw; } };
+/** API errors as a sentence: "Rationale: String should have at least 3 characters", never raw JSON. */
+export const errorText = (e: unknown) => { const raw = (e as Error)?.message ?? "Something went wrong"; try { const d = JSON.parse(raw).detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) return d.map((x: { msg: string; loc?: (string | number)[] }) => { const field = [...(x.loc ?? [])].reverse().find(k => typeof k === "string" && k !== "body");
+    return `${field ? titleCase(String(field)) + ": " : ""}${x.msg.replace(/^Value error, /, "")}`; }).join("; ");
+  return d?.message ?? raw; } catch { return raw; } };

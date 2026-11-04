@@ -2,6 +2,9 @@
 // Reviewer adjustment grid for sales comparison. All arithmetic is done by the API
 // (api/app/services/comparable_adjustments.py); this component edits and displays the reviewed setup.
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { errorText } from "@/lib/monitor";
+import { Segmented, Switch } from "@/components/ui/sheet-ui";
 import { saveAdjustments, saveComparableAttributes, type AdjustmentFactor, type AdjustmentLine, type AdjustmentRow, type AdjustmentRule, type AdjustmentSetup, type ComparableAttributes, type PreparedAnalysis, type RuleFactor } from "@/lib/api";
 
 const FACTORS: { key: AdjustmentFactor; label: string; transactional?: boolean }[] = [
@@ -12,7 +15,7 @@ const FACTORS: { key: AdjustmentFactor; label: string; transactional?: boolean }
   { key: "occupancy", label: "Occupancy" }, { key: "development_potential", label: "Development potential" }, { key: "zoning", label: "Zoning" }, { key: "other", label: "Other" },
 ];
 const FACTOR_LABEL = Object.fromEntries(FACTORS.map(f => [f.key, f.label])) as Record<AdjustmentFactor, string>;
-const BASIS = { percent: "%", sar_per_sqm: "SAR/m²", sar_total: "SAR total" } as const;
+const BASIS = { percent: "%", sar_per_sqm: "SAR/m²", sar_total: "SAR" } as const;
 const n0 = new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 });
 const pct = (v: number | null | undefined, digits = 1) => v == null ? "—" : `${(v * 100).toFixed(digits)}%`;
 const EMPTY: AdjustmentSetup = { lines: [], rules: [], time: null, weighting: "equal", manual_weights: {}, weighting_rationale: null, conclusion_basis: "median", exclusions: {} };
@@ -29,7 +32,7 @@ const RULES: Record<RuleFactor, { label: string; each: string; attribute: keyof 
 };
 const fmtValue = (v: unknown) => v == null ? "not set" : v === true ? "yes" : v === false ? "no" : String(v);
 export function AttributeInput({ factor, value, onChange }: { factor: RuleFactor; value: ComparableAttributes; onChange: (patch: ComparableAttributes) => void }) {
-  const cls = "mizan-compact-input !w-28 !py-1.5 text-right";
+  const cls = "mizan-compact-input !w-32 text-right";
   if (factor === "floor") return <input aria-label="Floor" className={cls} type="number" step="1" value={value.floor ?? ""} onChange={e => onChange({ floor: e.target.value === "" ? null : Math.trunc(Number(e.target.value)) })} placeholder="Not set" />;
   if (factor === "street_width") return <input aria-label="Street width in metres" className={cls} type="number" min="0" step="any" value={value.street_width_m ?? ""} onChange={e => onChange({ street_width_m: e.target.value === "" ? null : Number(e.target.value) })} placeholder="Not set" />;
   if (factor === "position") return <select aria-label="Position in building" className={cls} value={value.position ?? ""} onChange={e => onChange({ position: (e.target.value || null) as ComparableAttributes["position"] })}><option value="">Not set</option><option value="rear">Rear</option><option value="side">Side</option><option value="front">Front</option><option value="corner">Corner</option></select>;
@@ -39,11 +42,16 @@ export function AttributeInput({ factor, value, onChange }: { factor: RuleFactor
 }
 
 type Props = { propertyId: string; prepared: PreparedAnalysis; disabled: boolean; onSaved: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void; onEvidenceChanged: () => void };
+const signed = (v: number | null | undefined, digits = 1) => v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(digits)}%`;
+const km = (v: number | null | undefined) => v == null ? "—" : v < 1 ? `${Math.round(v * 1000)} m` : `${v.toFixed(1)} km`;
+// A new line nobody has filled in is not an adjustment; it is dropped on save instead of blocking it.
+const untouched = (l: AdjustmentLine) => !l.amount && !l.rationale.trim() && !l.source;
+const lineProblem = (l: AdjustmentLine) => untouched(l) ? null : l.rationale.trim().length < 3 ? "Say why, in at least 3 characters" : !Number.isFinite(l.amount) ? "Enter a number" : null;
 
 export default function AdjustmentGrid({ propertyId, prepared, disabled, onSaved, onSelectEvidence, onEvidenceChanged }: Props) {
   const saved = useMemo(() => ({ ...EMPTY, ...(prepared.adjustment_setup || {}) }), [prepared.adjustment_setup]);
   const [setup, setSetup] = useState<AdjustmentSetup>(saved);
-  const [reason, setReason] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [tried, setTried] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const savedKey = JSON.stringify(saved);
   // Adopt the server's saved grid only when there are no unsaved local edits.
@@ -62,120 +70,150 @@ export default function AdjustmentGrid({ propertyId, prepared, disabled, onSaved
     const rest = s.rules.filter(r => r.factor !== factor); const current = s.rules.find(r => r.factor === factor);
     return { ...s, rules: patch ? [...rest, { factor, percent: 0, source: "Reviewer judgement", status: "approved" as const, ...current, ...patch }] : rest }; });
 
+  const problems = setup.lines.map(lineProblem).filter(Boolean).length + (setup.weighting === "manual" && (setup.weighting_rationale || "").trim().length < 3 ? 1 : 0)
+    + (setup.time && setup.time.source.trim().length < 3 ? 1 : 0);
   async function save() {
-    setBusy(true); setError("");
+    setTried(true); setError("");
+    if (problems) { setError(`${problems} ${problems === 1 ? "item needs" : "items need"} attention before saving. Fix the highlighted fields, or remove them.`); return; }
+    setBusy(true);
     try {
-      const p = await saveAdjustments(propertyId, { expected_revision: prepared.revision, reason: reason.trim() || "Reviewed comparable adjustments", adjustments: setup });
-      setBase(JSON.stringify({ ...EMPTY, ...(p.adjustment_setup || {}) })); setReason(""); onSaved(p);
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+      const clean = { ...setup, lines: setup.lines.filter(l => !untouched(l)) };
+      const p = await saveAdjustments(propertyId, { expected_revision: prepared.revision, reason: `Reviewed comparable adjustments: ${clean.rules.length} rule(s), ${clean.lines.length} line(s), ${Object.keys(clean.exclusions).length} exclusion(s)`, adjustments: clean });
+      setBase(JSON.stringify({ ...EMPTY, ...(p.adjustment_setup || {}) })); setTried(false); onSaved(p);
+    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
 
-  return <section className="space-y-3 text-xs" aria-label="Comparable adjustment grid">
-    <div className="flex items-start justify-between gap-2">
-      <p className="text-[12.5px] text-black/50">Unit values are SAR per m². Only adjustments you approve are applied.</p>
-      {dirty && <span className="mizan-chip !bg-amber-50 !border-amber-200 !text-amber-900">Unsaved changes</span>}
+  return <section className="space-y-4 text-[14px]" aria-label="Comparable adjustments">
+    {/* Outcome from the last saved grid. */}
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.06]">
+      <div className="text-[12.5px] text-[#5F5F64]">Concluded unit value</div>
+      <div className="text-[26px] font-semibold tabular-nums tracking-tight text-[#1D1D1F]">{a.concluded_sar_sqm == null ? "—" : `${n0.format(a.concluded_sar_sqm)} SAR/m²`}</div>
+      <div className="text-[12.5px] text-[#5F5F64]">{a.indication ? <>SAR {n0.format(a.indication.base)} for the property · middle half {n0.format(a.indication.low)}–{n0.format(a.indication.high)}</> : "Needs the property's area and a valid grid"}</div>
+      <div className="mt-1 text-[12px] text-[#5F5F64]">{titleOf(a.conclusion_basis)} of {a.rows.length} sales{a.excluded.length ? ` · ${a.excluded.length} excluded` : ""} · {titleOf(a.weighting)} weights</div>
+      {a.raw && a.adjusted && <details className="mt-2"><summary className="cursor-pointer text-[13px] text-[#0062C4]">Statistics</summary>
+        <table className="mt-2 w-full text-[12.5px] tabular-nums [&_td]:py-1 [&_td:not(:first-child)]:text-right [&_th]:pb-1 [&_th]:font-medium [&_th]:text-[#5F5F64] [&_th:not(:first-child)]:text-right [&_tr]:border-b [&_tr]:border-black/[0.05]">
+          <thead><tr><th className="text-left">SAR/m²</th><th>Before</th><th>After</th></tr></thead>
+          <tbody>
+            <tr><td className="text-[#5F5F64]">Median</td><td>{n0.format(a.raw.median)}</td><td>{n0.format(a.adjusted.median)}</td></tr>
+            <tr><td className="text-[#5F5F64]">Mean</td><td>{n0.format(a.raw.mean)}</td><td>{n0.format(a.adjusted.mean)}</td></tr>
+            <tr><td className="text-[#5F5F64]">Weighted median</td><td>—</td><td>{a.adjusted.weighted_median == null ? "—" : n0.format(a.adjusted.weighted_median)}</td></tr>
+            <tr><td className="text-[#5F5F64]">Middle half</td><td>{n0.format(a.raw.p25)}–{n0.format(a.raw.p75)}</td><td>{n0.format(a.adjusted.p25)}–{n0.format(a.adjusted.p75)}</td></tr>
+            <tr><td className="text-[#5F5F64]">Spread (CV)</td><td>{pct(a.raw.cv, 0)}</td><td>{pct(a.adjusted.cv, 0)}</td></tr>
+          </tbody></table><p className="mt-1 text-[11.5px] text-[#5F5F64]">The middle half is not a confidence interval.</p></details>}
     </div>
+    {!!a.gaps.length && <ul className="list-disc rounded-xl bg-[rgba(255,159,10,0.12)] py-2 pl-7 pr-3 text-[13px] text-[#8A5200]">{a.gaps.map(g => <li key={g}>{g}</li>)}</ul>}
+    {a.pending_count > 0 && <p className="text-[13px] text-[#8A5200]">{a.pending_count} saved {a.pending_count === 1 ? "adjustment is" : "adjustments are"} switched off, so not applied.</p>}
+    {a.orphaned_lines.length > 0 && <p className="text-[13px] text-[#8A5200]">{a.orphaned_lines.length} saved {a.orphaned_lines.length === 1 ? "adjustment refers to a sale" : "adjustments refer to sales"} no longer eligible, and {a.orphaned_lines.length === 1 ? "is" : "are"} ignored.</p>}
 
-    {/* Reconciled outcome from the last saved grid. */}
-    <div className="grid grid-cols-2 gap-2">
-      <div className="rounded bg-slate-50 p-2"><p className="text-slate-500">Concluded unit value</p>
-        <p className="text-base font-semibold">{a.concluded_sar_sqm == null ? "Not available" : `${n0.format(a.concluded_sar_sqm)} SAR/m²`}</p>
-        <p className="text-[10px] text-slate-500">{a.conclusion_basis.replaceAll("_", " ")} · {a.weighting.replaceAll("_", " ")} weights · n={a.rows.length}</p></div>
-      <div className="rounded bg-slate-50 p-2"><p className="text-slate-500">Indication (subject area)</p>
-        {a.indication ? <><p className="text-base font-semibold">SAR {n0.format(a.indication.base)}</p>
-          <p className="text-[10px] text-slate-500">IQR {n0.format(a.indication.low)} – {n0.format(a.indication.high)} · not a confidence interval</p></> : <p className="text-slate-500">Needs subject area and a valid grid</p>}</div>
-    </div>
-    {a.raw && a.adjusted && <table className="w-full text-[12px] tabular-nums [&_td]:py-1 [&_td:not(:first-child)]:text-right [&_th]:pb-1 [&_th]:font-medium [&_th]:text-black/40 [&_th:not(:first-child)]:text-right [&_tr]:border-b [&_tr]:border-black/[0.05]">
-      <thead><tr><th className="text-left">SAR/m²</th><th>Raw</th><th>Adjusted</th></tr></thead>
-      <tbody>
-        <tr><td className="text-black/55">Median</td><td>{n0.format(a.raw.median)}</td><td>{n0.format(a.adjusted.median)}</td></tr>
-        <tr><td className="text-black/55">Mean</td><td>{n0.format(a.raw.mean)}</td><td>{n0.format(a.adjusted.mean)}</td></tr>
-        <tr><td className="text-black/55">Weighted median</td><td>—</td><td>{a.adjusted.weighted_median == null ? "—" : n0.format(a.adjusted.weighted_median)}</td></tr>
-        <tr><td className="text-black/55">Weighted mean</td><td>—</td><td>{a.adjusted.weighted_mean == null ? "—" : n0.format(a.adjusted.weighted_mean)}</td></tr>
-        <tr><td className="text-black/55">Middle half</td><td>{n0.format(a.raw.p25)}–{n0.format(a.raw.p75)}</td><td>{n0.format(a.adjusted.p25)}–{n0.format(a.adjusted.p75)}</td></tr>
-        <tr><td className="text-black/55">Spread (CV)</td><td>{pct(a.raw.cv, 0)}</td><td>{pct(a.adjusted.cv, 0)}</td></tr>
-      </tbody></table>}
-    {!!a.gaps.length && <ul className="list-disc pl-4 text-amber-900">{a.gaps.map(g => <li key={g}>{g}</li>)}</ul>}
-    {a.pending_count > 0 && <p className="text-amber-800">{a.pending_count} proposed adjustment(s) saved but not approved — not applied.</p>}
-    {a.orphaned_lines.length > 0 && <p className="text-amber-800">{a.orphaned_lines.length} saved adjustment(s) refer to comparables that are no longer eligible and are ignored.</p>}
-
-    {/* One line per factor; it applies to every sale from the difference in details. */}
-    <div className="rounded-xl bg-black/[0.03] p-3"><h4 className="text-[13.5px] font-semibold text-black/80">Compare to this property</h4>
-      <p className="mb-2 text-[12px] leading-snug text-black/50">Set a rate once and it applies to every sale. Use a minus sign to lower the sale’s value. Mizan doesn’t suggest rates.</p>
-      <ul className="space-y-2.5">{factors.map(f => { const def = RULES[f]; const rule = setup.rules.find(r => r.factor === f);
-        return <li key={f}><div className="flex items-center gap-2"><span className="min-w-0 flex-1"><span className="block text-[13.5px] font-medium text-black/80">{def.label}</span>
-            <span className="block text-[11.5px] leading-snug text-black/50">{def.each}{def.attribute ? ` · this property: ${fmtValue(subject[def.attribute])}` : ""}</span></span>
-          <label className="flex items-center gap-1 whitespace-nowrap text-[13px] text-black/60"><input aria-label={`${def.label} rate in percent`} type="number" step="0.1" min="-50" max="50" placeholder="0" className="mizan-compact-input !w-16 !py-1.5 text-right"
+    {/* One rate per factor, applied to every sale from the difference in details. */}
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.06]">
+      <h4 className="text-[16px] font-semibold text-[#1D1D1F]">Compare to this property</h4>
+      <p className="mb-3 text-[12.5px] leading-snug text-[#5F5F64]">Set a rate once and it applies to every sale. A minus sign lowers the sale. Mizan doesn’t suggest rates.</p>
+      <ul className="divide-y divide-black/[0.06]">{factors.map(f => { const def = RULES[f]; const rule = setup.rules.find(r => r.factor === f);
+        return <li key={f} className="py-2.5"><div className="flex items-center gap-3"><span className="min-w-0 flex-1"><span className="block text-[14.5px] font-medium text-[#1D1D1F]">{def.label}</span>
+            <span className="block text-[12px] leading-snug text-[#5F5F64]">{def.each}{def.attribute ? ` · this property: ${fmtValue(subject[def.attribute])}` : ""}</span></span>
+          <label className="flex items-center gap-1.5 whitespace-nowrap text-[14px] text-[#5F5F64]"><input aria-label={`${def.label} rate in percent`} type="number" step="0.1" min="-50" max="50" placeholder="0" className="mizan-compact-input !w-20 text-right"
             value={rule ? Number((rule.percent * 100).toFixed(3)) : ""} onChange={e => e.target.value === "" ? setRule(f, null) : setRule(f, { percent: Number(e.target.value) / 100 })} />%</label></div>
-          {rule && <input aria-label={`${def.label} rate source`} className="mizan-compact-input mt-1 !text-[11.5px]" value={rule.source} placeholder="Basis for this rate" onChange={e => setRule(f, { source: e.target.value })} />}
+          {rule && <input aria-label={`${def.label} rate basis`} className="mizan-compact-input mt-2 !h-8 !text-[13px]" value={rule.source} placeholder="Basis for this rate" onChange={e => setRule(f, { source: e.target.value })} />}
         </li>; })}</ul>
-      {!dirty && setup.rules.length > 0 && <p className="mt-2 text-[11.5px] text-black/45">Applied. A manual adjustment on a sale replaces the rule for that sale.</p>}
     </div>
 
-    {/* Time rule and reconciliation settings. */}
-    <details className="rounded border border-slate-200 p-2" open={!!setup.time}>
-      <summary className="font-medium cursor-pointer">Market conditions (time) rule {setup.time ? `· ${pct(setup.time.annual_rate)}/yr · ${setup.time.status}` : "· none"}</summary>
-      {setup.time ? <div className="grid grid-cols-2 gap-2 mt-2">
-        <label>Annual change (%)<input className="mizan-compact-input" type="number" step="0.1" value={Number((setup.time.annual_rate * 100).toFixed(4))} onChange={e => update({ time: { ...setup.time!, annual_rate: Number(e.target.value) / 100 } })} /></label>
-        <label>Source date<input className="mizan-compact-input" type="date" value={setup.time.as_of} onChange={e => update({ time: { ...setup.time!, as_of: e.target.value } })} /></label>
-        <label className="col-span-2">Source / basis<input className="mizan-compact-input" value={setup.time.source} placeholder="e.g. index, paired sales, reviewer judgement" onChange={e => update({ time: { ...setup.time!, source: e.target.value } })} /></label>
-        <label className="flex items-center gap-1.5"><input type="checkbox" checked={setup.time.status === "approved"} onChange={e => update({ time: { ...setup.time!, status: e.target.checked ? "approved" : "proposed" } })} />Approved</label>
-        <button type="button" className="text-left text-red-700 underline" onClick={() => update({ time: null })}>Remove rule</button>
-        <p className="col-span-2 text-[10px] text-slate-500">Compounded from each sale date to the valuation date ({prepared.as_of}). No rate is suggested by Mizan.</p></div>
-        : <button type="button" className="mt-2 text-blue-700 underline" onClick={() => update({ time: { annual_rate: 0, source: "", as_of: prepared.as_of, status: "proposed" } })}>Add a sourced annual market-change rate</button>}
+    {/* One row per sale; details and its own adjustments one tap away. */}
+    <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.06]">
+      <div className="flex items-baseline justify-between px-4 pb-1 pt-3"><h4 className="text-[16px] font-semibold text-[#1D1D1F]">Sales</h4><span className="text-[12px] text-[#5F5F64]">SAR/m², after adjustments</span></div>
+      <ul className="divide-y divide-black/[0.06]">{rows.map(r => {
+        const excluded = r.id in setup.exclusions; const lines = setup.lines.map((l, i) => [l, i] as const).filter(([l]) => l.comparable_id === r.id);
+        const change = r.raw_sar_sqm ? r.adjusted_sar_sqm / r.raw_sar_sqm - 1 : null; const isOpen = open === r.id;
+        return <li key={r.id} className={excluded ? "bg-black/[0.02]" : ""}>
+          <button type="button" className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-black/[0.02]" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : r.id); onSelectEvidence(r.id); }}>
+            <span className="min-w-0 flex-1"><span className={`line-clamp-2 text-[14.5px] font-medium leading-snug ${excluded ? "text-[#5F5F64] line-through" : "text-[#1D1D1F]"}`} dir="auto">{(r.title || r.id).replace(/^DEMO · /, "")}</span>
+              <span className="block text-[12.5px] text-[#5F5F64]">{[r.date || "Undated", km(r.distance_km), r.area_sqm == null ? null : `${n0.format(r.area_sqm)} m²`].filter(Boolean).join(" · ")}</span>
+              <span className="block text-[12.5px] text-[#5F5F64]">{[...factors.filter(f => RULES[f].attribute).map(f => describe(f, r.attributes)), /^DEMO · /.test(r.title || "") ? "Demo" : null].filter(Boolean).join(" · ")}</span></span>
+            <span className="text-right"><span className="block text-[15px] font-semibold tabular-nums text-[#1D1D1F]">{excluded ? "Excluded" : n0.format(r.adjusted_sar_sqm)}</span>
+              <span className="block text-[12px] tabular-nums text-[#5F5F64]">{excluded ? "" : !change || Math.abs(change) < 0.0005 ? `${n0.format(r.raw_sar_sqm)} · unadjusted` : `${n0.format(r.raw_sar_sqm)} · ${signed(change)}`}</span></span>
+            <ChevronDown size={16} className={`shrink-0 text-[#5F5F64] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </button>
+          {r.notes.length > 0 && !isOpen && <p className="-mt-1 px-4 pb-2 text-[12px] text-[#8A5200]">{r.notes[0]}</p>}
+          {isOpen && <div className="space-y-3 bg-[#F5F5F7] px-4 py-3">
+            {r.notes.map(n => <p key={n} className="text-[12.5px] text-[#8A5200]">{n}</p>)}
+            {!excluded && <ComparableDetails key={JSON.stringify(r.attributes)} entityId={r.id.replace(/^comparable:/, "")} factors={factors} attributes={r.attributes} onSaved={onEvidenceChanged} />}
+            {r.steps.length > 0 && <div><p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-[#5F5F64]">Applied</p>
+              <ul className="space-y-1">{r.steps.map((s, i) => <li key={i} className="flex justify-between gap-3 text-[13.5px]"><span className="min-w-0 text-[#1D1D1F]">{FACTOR_LABEL[s.factor]}<span className="block truncate text-[12px] text-[#5F5F64]">{s.derived ? "From your rate" : s.rationale}</span></span><span className="whitespace-nowrap tabular-nums">{amountLabel(s)}</span></li>)}</ul></div>}
+            {!excluded && <div><p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-[#5F5F64]">Adjustments for this sale only</p>
+              {lines.length === 0 && <p className="text-[12.5px] text-[#5F5F64]">None. An adjustment here replaces the rate for its factor on this sale.</p>}
+              <div className="space-y-2">{lines.map(([l, i]) => <LineEditor key={i} line={l} showErrors={tried} onChange={patch => setLine(i, patch)} onRemove={() => setLine(i, null)} />)}</div>
+              <button type="button" className="mt-2 inline-flex items-center gap-1 text-[13.5px] font-medium text-[#0062C4]" onClick={() => update({ lines: [...setup.lines, { comparable_id: r.id, factor: factors.includes("street_width") ? "street_width" : "location", basis: "percent", amount: 0, rationale: "", source: null, status: "approved" }] })}><Plus size={15} />Add adjustment</button></div>}
+            {setup.weighting === "manual" && !excluded && <label className="flex items-center justify-between gap-2 text-[13.5px]">Weight<input className="mizan-compact-input !w-24 text-right" type="number" min={0} step="any" value={setup.manual_weights[r.id] ?? ""}
+              onChange={e => update({ manual_weights: { ...setup.manual_weights, [r.id]: Number(e.target.value) } })} /></label>}
+            {r.weight != null && setup.weighting !== "equal" && !excluded && <p className="text-[12.5px] text-[#5F5F64]">Weight in the conclusion: {(r.weight * 100).toFixed(0)}%</p>}
+            {excluded ? <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="text-[#5F5F64]">Excluded: {setup.exclusions[r.id]}</span>
+              <button type="button" className="font-medium text-[#0062C4]" onClick={() => { const next = { ...setup.exclusions }; delete next[r.id]; update({ exclusions: next }); }}>Include again</button></div>
+              : <ExcludeControl onExclude={why => update({ exclusions: { ...setup.exclusions, [r.id]: why } })} />}
+          </div>}
+        </li>; })}</ul>
+    </div>
+
+    {/* Less-used settings stay folded away. */}
+    <details className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.06]" open={!!setup.time || setup.weighting !== "equal"}>
+      <summary className="cursor-pointer text-[15px] font-medium text-[#1D1D1F]">Time and weighting</summary>
+      <div className="mt-3 space-y-3">
+        {setup.time ? <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2"><span className="text-[14px]">Market change per year</span>
+            <label className="flex items-center gap-1.5 text-[#5F5F64]"><input className="mizan-compact-input !w-20 text-right" type="number" step="0.1" value={Number((setup.time.annual_rate * 100).toFixed(4))} onChange={e => update({ time: { ...setup.time!, annual_rate: Number(e.target.value) / 100 } })} />%</label></div>
+          <input className="mizan-compact-input" aria-invalid={tried && setup.time.source.trim().length < 3} value={setup.time.source} placeholder="Basis, e.g. index or paired sales (required)" onChange={e => update({ time: { ...setup.time!, source: e.target.value } })} />
+          <div className="flex items-center justify-between gap-2"><label className="text-[13px] text-[#5F5F64]">Source date <input className="mizan-compact-input mt-1 !w-40" type="date" value={setup.time.as_of} onChange={e => update({ time: { ...setup.time!, as_of: e.target.value } })} /></label>
+            <span className="flex items-center gap-2 text-[13.5px]">Apply<Switch label="Apply the time rule" checked={setup.time.status === "approved"} onChange={v => update({ time: { ...setup.time!, status: v ? "approved" : "proposed" } })} /></span></div>
+          <p className="text-[12px] text-[#5F5F64]">Compounded from each sale date to {prepared.as_of}. <button type="button" className="text-[#C0271B]" onClick={() => update({ time: null })}>Remove</button></p></div>
+          : <button type="button" className="inline-flex items-center gap-1 text-[13.5px] font-medium text-[#0062C4]" onClick={() => update({ time: { annual_rate: 0, source: "", as_of: prepared.as_of, status: "approved" } })}><Plus size={15} />Add a market change rate</button>}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-[13px] text-[#5F5F64]">Weighting<select className="mizan-compact-input mt-1" value={setup.weighting} onChange={e => update({ weighting: e.target.value as AdjustmentSetup["weighting"] })}>
+            <option value="equal">Equal</option><option value="inverse_gross_adjustment">Less adjusted count more</option><option value="manual">Manual</option></select></label>
+          <label className="text-[13px] text-[#5F5F64]">Conclude on<select className="mizan-compact-input mt-1" value={setup.conclusion_basis} onChange={e => update({ conclusion_basis: e.target.value as AdjustmentSetup["conclusion_basis"] })}>
+            <option value="median">Median</option><option value="mean">Mean</option><option value="weighted_median">Weighted median</option><option value="weighted_mean">Weighted mean</option></select></label>
+        </div>
+        {setup.weighting === "inverse_gross_adjustment" && <p className="text-[12px] text-[#5F5F64]">Weight is 1 ÷ (5% + gross adjustment), so sales needing less adjustment count more.</p>}
+        {setup.weighting === "manual" && <input className="mizan-compact-input" aria-invalid={tried && (setup.weighting_rationale || "").trim().length < 3} value={setup.weighting_rationale || ""} onChange={e => update({ weighting_rationale: e.target.value })} placeholder="Why these weights (required)" />}
+      </div>
     </details>
-    <div className="grid grid-cols-2 gap-2">
-      <label>Weighting<select className="mizan-compact-input" value={setup.weighting} onChange={e => update({ weighting: e.target.value as AdjustmentSetup["weighting"] })}>
-        <option value="equal">Equal</option><option value="inverse_gross_adjustment">Inverse gross adjustment</option><option value="manual">Manual (with rationale)</option></select></label>
-      <label>Conclude on<select className="mizan-compact-input" value={setup.conclusion_basis} onChange={e => update({ conclusion_basis: e.target.value as AdjustmentSetup["conclusion_basis"] })}>
-        <option value="median">Median</option><option value="mean">Mean</option><option value="weighted_median">Weighted median</option><option value="weighted_mean">Weighted mean</option></select></label>
-      {setup.weighting === "inverse_gross_adjustment" && <p className="col-span-2 text-[10px] text-slate-500">Weight ∝ 1 ÷ (5% + gross adjustment): less-adjusted sales count more.</p>}
-      {setup.weighting === "manual" && <label className="col-span-2">Weighting rationale<input className="mizan-compact-input" value={setup.weighting_rationale || ""} onChange={e => update({ weighting_rationale: e.target.value })} placeholder="Why these weights" /></label>}
-    </div>
 
-    {/* One card per comparable. */}
-    <ul className="space-y-1.5">{rows.map(r => {
-      const excluded = r.id in setup.exclusions; const lines = setup.lines.map((l, i) => [l, i] as const).filter(([l]) => l.comparable_id === r.id);
-      return <li key={r.id} className={`rounded-xl ${excluded ? "bg-black/[0.03] opacity-70" : "ring-1 ring-black/[0.06]"}`}>
-        <button type="button" className="w-full text-left px-2 py-1.5" aria-expanded={open === r.id} onClick={() => { setOpen(open === r.id ? null : r.id); onSelectEvidence(r.id); }}>
-          <div className="flex items-center gap-2"><span className="font-medium truncate flex-1" dir="auto">{r.title || r.id}</span>
-            <span className="whitespace-nowrap">{n0.format(r.raw_sar_sqm)} → <strong>{n0.format(r.adjusted_sar_sqm)}</strong></span></div>
-          <div className="flex gap-2 text-[10px] text-slate-500"><span>{r.date || "undated"} · {r.distance_km ?? "—"} km · {r.area_sqm == null ? "area —" : `${n0.format(r.area_sqm)} m²`}</span>
-            <span className="ml-auto">gross {pct(r.gross_adjustment, 0)} · net {pct(r.net_adjustment, 0)}{r.weight != null ? ` · w ${(r.weight * 100).toFixed(0)}%` : ""}{excluded ? " · excluded" : ""}</span></div>
-          {r.notes.map(n => <p key={n} className="text-[10px] text-amber-800">{n}</p>)}
-        </button>
-        {open === r.id && <div className="border-t border-slate-100 px-2 py-2 space-y-2">
-          {!excluded && <ComparableDetails key={JSON.stringify(r.attributes)} entityId={r.id.replace(/^comparable:/, "")} factors={factors} attributes={r.attributes} onSaved={onEvidenceChanged} />}
-          {r.steps.filter(s => s.derived).map((s, i) => <p key={i} className="text-[12px] text-black/70"><span className="font-medium">{FACTOR_LABEL[s.factor]}</span> {amountLabel(s)} <span className="text-black/45">({s.rationale})</span></p>)}
-          {lines.map(([l, i]) => <div key={i} className="grid grid-cols-[1fr_auto] gap-1 rounded bg-slate-50 p-1.5">
-            <div className="grid grid-cols-3 gap-1">
-              <select aria-label="Factor" className="mizan-compact-input" value={l.factor} onChange={e => setLine(i, { factor: e.target.value as AdjustmentFactor })}>{FACTORS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
-              <select aria-label="Basis" className="mizan-compact-input" value={l.basis} onChange={e => setLine(i, { basis: e.target.value as AdjustmentLine["basis"] })}>{Object.entries(BASIS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-              <input aria-label={l.basis === "percent" ? "Amount in percent" : "Amount in SAR"} className="mizan-compact-input" type="number" step="any"
-                value={l.basis === "percent" ? Number((l.amount * 100).toFixed(4)) : l.amount} onChange={e => setLine(i, { amount: l.basis === "percent" ? Number(e.target.value) / 100 : Number(e.target.value) })} />
-              <input aria-label="Rationale" className="mizan-compact-input col-span-3" value={l.rationale} placeholder="Rationale (required)" onChange={e => setLine(i, { rationale: e.target.value })} />
-              <input aria-label="Source" className="mizan-compact-input col-span-2" value={l.source || ""} placeholder="Source (optional)" onChange={e => setLine(i, { source: e.target.value || null })} />
-              <label className="flex items-center gap-1"><input type="checkbox" checked={l.status === "approved"} onChange={e => setLine(i, { status: e.target.checked ? "approved" : "proposed" })} />Approved</label>
-            </div>
-            <button type="button" aria-label="Remove adjustment" className="text-red-700 px-1 self-start" onClick={() => setLine(i, null)}>×</button>
-          </div>)}
-          <button type="button" className="text-blue-700 underline" onClick={() => update({ lines: [...setup.lines, { comparable_id: r.id, factor: "location", basis: "percent", amount: 0, rationale: "", source: null, status: "proposed" }] })}>+ Add adjustment</button>
-          {setup.weighting === "manual" && !excluded && <label className="flex items-center gap-2">Weight<input className="mizan-compact-input !w-24" type="number" min={0} step="any" value={setup.manual_weights[r.id] ?? ""}
-            onChange={e => update({ manual_weights: { ...setup.manual_weights, [r.id]: Number(e.target.value) } })} /></label>}
-          {excluded ? <div className="flex gap-2 items-center"><span className="text-slate-600">Excluded: {setup.exclusions[r.id]}</span>
-            <button type="button" className="text-blue-700 underline" onClick={() => { const next = { ...setup.exclusions }; delete next[r.id]; update({ exclusions: next }); }}>Include again</button></div>
-            : <ExcludeControl onExclude={why => update({ exclusions: { ...setup.exclusions, [r.id]: why } })} />}
-        </div>}
-      </li>; })}</ul>
-
-    <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
-      <input aria-label="Reason for this revision" className="mizan-compact-input flex-1 min-w-[160px]" value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason for this revision" />
-      <button type="button" className="mizan-button !py-1 !px-3 !text-xs" disabled={!dirty || busy || disabled} onClick={save}>{busy ? "Saving…" : "Save adjustments"}</button>
-      {dirty && <button type="button" className="text-slate-600 underline" onClick={() => setSetup(JSON.parse(base))}>Discard</button>}
-    </div>
-    {error && <p role="alert" className="mizan-error !text-xs">{error}</p>}
-    <details><summary className="cursor-pointer text-slate-500">Method conventions</summary><ul className="list-disc pl-4 mt-1 text-slate-500">{a.conventions.map(c => <li key={c}>{c}</li>)}</ul></details>
+    {/* Save bar: only when something changed. */}
+    {(dirty || error) && <div className="sticky bottom-0 z-10 -mx-1 rounded-2xl bg-white/95 p-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.06] backdrop-blur">
+      {error && <p role="alert" className="mb-2 text-[13px] text-[#C0271B]">{error}</p>}
+      <div className="flex items-center gap-3"><span className="flex-1 text-[13px] text-[#5F5F64]">{dirty ? "Unsaved changes" : ""}</span>
+        {dirty && <button type="button" className="text-[14px] font-medium text-[#0062C4]" onClick={() => { setSetup(JSON.parse(base)); setError(""); setTried(false); }}>Discard</button>}
+        <button type="button" className="h-10 rounded-[12px] bg-[#0071E3] px-4 text-[14.5px] font-semibold text-white disabled:opacity-40" disabled={!dirty || busy || disabled} onClick={save}>{busy ? "Saving…" : "Save"}</button></div>
+    </div>}
+    <details><summary className="cursor-pointer text-[13px] text-[#5F5F64]">How Mizan applies adjustments</summary><ul className="mt-1 list-disc pl-5 text-[12.5px] text-[#5F5F64]">{a.conventions.map(c => <li key={c}>{c}</li>)}</ul></details>
   </section>;
+}
+
+// The detail a rate compares on, as a short phrase; missing details say so rather than being hidden.
+function describe(f: RuleFactor, a: ComparableAttributes) {
+  if (f === "street_width") return a.street_width_m == null ? "street width not set" : `${n0.format(a.street_width_m)} m street`;
+  if (f === "corner") return a.corner == null ? "corner not set" : a.corner ? "corner" : "not a corner";
+  if (f === "floor") return a.floor == null ? "floor not set" : `floor ${a.floor}`;
+  if (f === "position") return a.position ? `${a.position} position` : "position not set";
+  if (f === "grade") return a.grade ? `grade ${a.grade}` : "grade not set";
+  return null;
+}
+const titleOf = (s: string) => s.replaceAll("_", " ").replace(/^./, c => c.toUpperCase());
+
+function LineEditor({ line, showErrors, onChange, onRemove }: { line: AdjustmentLine; showErrors: boolean; onChange: (patch: Partial<AdjustmentLine>) => void; onRemove: () => void }) {
+  const problem = lineProblem(line); const flag = showErrors && !!problem;
+  const percent = line.basis === "percent";
+  return <div className={`rounded-xl bg-white p-3 ${flag ? "ring-2 ring-[#C0271B]" : "ring-1 ring-black/[0.06]"}`}>
+    <div className="flex items-center gap-2">
+      <select aria-label="Factor" className="mizan-compact-input flex-1" value={line.factor} onChange={e => onChange({ factor: e.target.value as AdjustmentFactor })}>{FACTORS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}</select>
+      <input aria-label={percent ? "Amount in percent" : "Amount in SAR"} className="mizan-compact-input !w-24 text-right" type="number" step="any" placeholder="0"
+        value={line.amount ? (percent ? Number((line.amount * 100).toFixed(4)) : line.amount) : ""} onChange={e => onChange({ amount: e.target.value === "" ? 0 : percent ? Number(e.target.value) / 100 : Number(e.target.value) })} />
+      <button type="button" aria-label="Remove adjustment" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#C0271B] hover:bg-[#C0271B]/10" onClick={onRemove}><Trash2 size={16} /></button>
+    </div>
+    <div className="mt-2"><Segmented label="Unit" value={line.basis} onChange={v => onChange({ basis: v, amount: 0 })} options={[{ value: "percent", label: "%" }, { value: "sar_per_sqm", label: "SAR/m²" }, { value: "sar_total", label: "SAR total" }]} /></div>
+    <input aria-label="Why" aria-invalid={flag} className="mizan-compact-input mt-2" value={line.rationale} placeholder="Why? (required)" onChange={e => onChange({ rationale: e.target.value })} />
+    {flag && <p className="mt-1 text-[12px] text-[#C0271B]">{problem}</p>}
+    <div className="mt-2 flex items-center gap-2"><input aria-label="Source" className="mizan-compact-input flex-1 !h-8 !text-[13px]" value={line.source || ""} placeholder="Source (optional)" onChange={e => onChange({ source: e.target.value || null })} />
+      <span className="flex items-center gap-2 whitespace-nowrap text-[13px] text-[#5F5F64]">Apply<Switch label="Apply this adjustment" checked={line.status === "approved"} onChange={v => onChange({ status: v ? "approved" : "proposed" })} /></span></div>
+  </div>;
 }
 
 function ComparableDetails({ entityId, factors, attributes, onSaved }: { entityId: string; factors: RuleFactor[]; attributes: ComparableAttributes; onSaved: () => void }) {
@@ -187,17 +225,19 @@ function ComparableDetails({ entityId, factors, attributes, onSaved }: { entityI
   async function save() {
     setBusy(true); setError("");
     try { await saveComparableAttributes(entityId, clean(draft), "Reviewed comparable details"); onSaved(); }
-    catch (e) { setError((e as Error).message); setBusy(false); }
+    catch (e) { setError(errorText(e)); setBusy(false); }
   }
-  return <div className="rounded-lg bg-black/[0.03] p-2"><p className="mb-1 text-[12px] font-medium text-black/60">This sale’s details</p>
-    <div className="space-y-1.5">{editable.map(f => <div key={f} className="flex items-center justify-between gap-2 text-[13px] text-black/70"><span>{RULES[f].label}</span><AttributeInput factor={f} value={draft} onChange={p => setDraft(d => ({ ...d, ...p }))} /></div>)}</div>
-    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[13px] font-medium text-[#0071E3] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
+  return <div><p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-[#5F5F64]">This sale’s details</p>
+    <div className="divide-y divide-black/[0.06] rounded-xl bg-white px-3 ring-1 ring-black/[0.06]">{editable.map(f => <div key={f} className="flex min-h-[48px] items-center justify-between gap-2 text-[14px] text-[#1D1D1F]"><span>{RULES[f].label}</span><AttributeInput factor={f} value={draft} onChange={p => setDraft(d => ({ ...d, ...p }))} /></div>)}</div>
+    {changed && <button type="button" disabled={busy} onClick={save} className="mt-2 text-[13.5px] font-medium text-[#0062C4] disabled:opacity-40">{busy ? "Saving…" : "Save details"}</button>}
     {error && <p role="alert" className="mt-1 text-[12px] text-[#C0271B]">{error}</p>}
   </div>;
 }
 
 function ExcludeControl({ onExclude }: { onExclude: (reason: string) => void }) {
-  const [why, setWhy] = useState("");
-  return <div className="flex gap-1"><input aria-label="Exclusion reason" className="mizan-compact-input" value={why} onChange={e => setWhy(e.target.value)} placeholder="Reason to exclude" />
-    <button type="button" className="text-red-700 underline whitespace-nowrap disabled:text-slate-300" disabled={why.trim().length < 3} onClick={() => onExclude(why.trim())}>Exclude</button></div>;
+  const [open, setOpen] = useState(false); const [why, setWhy] = useState("");
+  if (!open) return <button type="button" className="text-[13.5px] font-medium text-[#C0271B]" onClick={() => setOpen(true)}>Exclude this sale…</button>;
+  return <div className="flex items-center gap-2"><input aria-label="Reason to exclude" autoFocus className="mizan-compact-input flex-1" value={why} onChange={e => setWhy(e.target.value)} placeholder="Why exclude it?" />
+    <button type="button" className="whitespace-nowrap text-[13.5px] font-medium text-[#C0271B] disabled:opacity-40" disabled={why.trim().length < 3} onClick={() => onExclude(why.trim())}>Exclude</button>
+    <button type="button" className="text-[13.5px] text-[#5F5F64]" onClick={() => { setOpen(false); setWhy(""); }}>Cancel</button></div>;
 }
