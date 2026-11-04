@@ -1,5 +1,12 @@
 # Continuation log
 
+## 4 November 2026: Area from the map
+
+- `GET /api/v1/footprint?lat&lng` (`api/app/routers/footprint.py`): the OpenStreetMap building outline under or within 12 m of the pin, via public Overpass instances asked in parallel (first answer wins, 45 s limit, one-day cache, `MIZAN_OVERPASS_URL` adds your own). Returns the ring, geodesic area, mapped floors and the OSM link. Nothing is returned when no building is mapped; land parcels have no free authorised source, so none is guessed. Tests: `api/tests/test_footprint.py` (5).
+- Map flow: dropping a pin looks up the building and draws it dashed; the card shows its footprint and offers "Use as the site outline". After the type is chosen, an Area row shows what will be used: land = traced (or adopted) outline area; whole-building types = footprint, or footprint × mapped floors marked estimated; apartments and offices are never filled from a building.
+- The valuation's area field (`area_sqm` or `building_area`) is filled only when blank, with the source text and today's date. Saved outlines now record `source: openstreetmap` and its link when adopted (schema allows `user_drawn` or `openstreetmap`, still `cadastral: false`).
+- Live check 4 Nov 2026: public Overpass servers were slow (37 s) or at capacity; central Riyadh has about 110 mapped buildings within 300 m, only 6 with floors. A local building dataset would make this instant and private.
+
 ## 3 November 2026: Redesign applied (map first)
 
 Took the parts of the owner's Claude Design file (`Mizan Redesign.html`, not committed) that fit the existing app; nothing functional removed.

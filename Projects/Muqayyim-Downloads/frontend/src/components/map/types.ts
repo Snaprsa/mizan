@@ -20,6 +20,8 @@ export type RendererProps = {
   basemap: Basemap; initialCamera: Camera | null;
   subject: Subject | null; subjectDraggable: boolean;
   searchArea: SearchArea | null; editArea: boolean; siteOutline: LatLng[] | null;
+  /** A building outline found under the pin, shown before the user adopts it. */
+  footprint: LatLng[] | null;
   /** Temporary search-result marker; never a subject or evidence. */
   placeMarker: LatLng | null;
   tool: MapTool; draft: Draft;

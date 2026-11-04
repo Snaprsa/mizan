@@ -63,6 +63,7 @@ These checks do not verify live satellite imagery, provider feeds, professional 
 - `/api/v1/properties`: create/search/detail/replace, case link, assumptions and revisions.
 - `/api/v1/market`: sources, JSON/CSV observations, filtering and local-dataset inventory.
 - `/api/v1/map/records`: owned property/comparable/observation projection, counts, source precision and coverage.
+- `/api/v1/footprint`: OpenStreetMap building outline and area under a map point (approximate, never a parcel).
 - `/api/v1/monitor`: portfolios, assets, checks, snapshots, overrides, official valuations, events, alerts, stress, audit and the demo fund.
 - `/api/v1/analysis`: method catalog, start, prepare, save inputs, calculate runs and saved history.
 - Existing `/api/v1/cases`, sources, extraction jobs, comparables/overrides/status, export routes.

@@ -9,8 +9,10 @@ import AdjustmentGrid, { AttributeInput } from "./adjustment-grid";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
-export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0 }: {
+export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0, areaSuggestion = null }: {
   propertyId: string; methods: ValuationMethod[]; onPrepared: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void;
+  /** An area measured or estimated on the map, with its source. It only fills an empty area field. */
+  areaSuggestion?: { value: number; source: string; as_of: string } | null;
   /** Increment after another screen changes the property (e.g. map geometry) to adopt its new revision. */
   refreshKey?: number;
 }) {
@@ -35,6 +37,15 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
     }).catch(e => { if (current) setError(e.message); });
     return () => { current = false; alive.current = false; };
   }, [propertyId, hydrate]);
+  useEffect(() => {
+    if (!areaSuggestion || !prepared) return;
+    setDraft(d => { const next = { ...d }; let changed = false;
+      for (const key of ["area_sqm", "building_area"]) {
+        const field = prepared.fields.find(f => f.key === key);
+        if (field && next[key] && next[key].value === "" && next[key].source === "") { next[key] = { value: String(areaSuggestion.value), source: areaSuggestion.source, as_of: areaSuggestion.as_of }; changed = true; }
+      }
+      return changed ? next : d; });
+  }, [areaSuggestion, prepared]);
   const values = useMemo(() => Object.fromEntries(Object.entries(draft).filter(([, d]) => d.value !== "").map(([key, d]) => [key, { value: Number(d.value), source: d.source, as_of: d.as_of,
       status: prepared?.fields.find(f => f.key === key && f.value === Number(d.value) && f.source === d.source && f.as_of === d.as_of)?.assumption_status || "user_input" }])) as Record<string, AnalysisInput>, [draft, prepared]);
   const signature = useMemo(() => valuationSignature({ method, asOf, radius: Number(radius),

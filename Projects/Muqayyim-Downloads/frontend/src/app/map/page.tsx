@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronRight, Circle, Expand, Hexagon, Layers, LocateFixed, Map as MapIcon, Menu, Minus, PencilRuler, Plus, Ruler, Scan, Shrink, SlidersHorizontal, Square, Table2, X } from "lucide-react";
-import { getMapRecords, getProperty, saveProperty, getValuationCatalog, startMapAnalysis, type MapRecord, type MapResponse, type PreparedAnalysis, type ValuationMethod } from "@/lib/api";
+import { getFootprint, getMapRecords, getProperty, saveProperty, type Footprint, getValuationCatalog, startMapAnalysis, type MapRecord, type MapResponse, type PreparedAnalysis, type ValuationMethod } from "@/lib/api";
 import ValuationWorkflow from "@/components/valuation-workflow";
 import { areaPoints, formatArea, formatDistance, geodesicAreaSqm, haversineMeters, inSearchArea, latLngsFromPolygon, pathLengthMeters, polygonFromLatLngs, type GeoJSONPolygon, type LatLng, type SearchArea } from "@/lib/geo";
 import { applyEvidenceFilters, evidenceSummaries, facetValues, LAYER, LAYERS, riyadhToday, sourceLabel, UNAVAILABLE_LAYERS } from "@/lib/map-evidence";
@@ -18,10 +18,13 @@ import { CoveragePanel, EvidenceTable, money, precisionLabel } from "@/component
 import type { Draft, MapBounds, MapStatus, MapTool, RendererHandle } from "@/components/map/types";
 import { Glass, PrimaryButton, Row, Section, Segmented, SheetHeader, Switch } from "@/components/ui/sheet-ui";
 import EvidenceKey from "@/components/map/evidence-key";
+import { errorText } from "@/lib/monitor";
 
 const MapRenderer = dynamic(() => import("@/components/map/map-renderer"), { ssr: false,
   loading: () => <div className="absolute inset-0 bg-[#e8e6e1]" aria-label="Loading map" /> });
 const LIMIT = 5000;
+// Types whose area is a whole building, so a mapped building outline can stand in for it.
+const BUILDING_TYPES = new Set(["villa", "residential_building", "warehouse", "logistics", "industrial", "hotel", "mixed_use", "retail", "special_purpose"]);
 const inBounds = (p: LatLng | null, b: MapBounds | null) => !!p && !!b && p[0] >= b.south && p[0] <= b.north && (b.west <= b.east ? p[1] >= b.west && p[1] <= b.east : p[1] >= b.west || p[1] <= b.east);
 const n0 = new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 });
 // Unicode isolate: stops an Arabic district from flipping a neighbouring date (2027-02-04 shown as 04-02-2027).
@@ -52,6 +55,10 @@ function MapWorkspace() {
   const [fullscreen, setFullscreen] = useState(false); const [narrow, setNarrow] = useState(false);
   const [popover, setPopover] = useState<"" | "style" | "tools" | "menu">(""); const [filtersOpen, setFiltersOpen] = useState(false);
   const [kindFocus, setKindFocus] = useState<MapRecord["kind"] | null>(null);
+  // The building outline under the pin (OpenStreetMap), and where the current site outline came from.
+  const [footprint, setFootprint] = useState<{ key: string; status: "loading" | "found" | "none" | "error"; data?: Footprint; error?: string } | null>(null);
+  const [outlineOrigin, setOutlineOrigin] = useState<{ source: "user_drawn" | "openstreetmap"; url?: string }>({ source: "user_drawn" });
+  const [footprintTry, setFootprintTry] = useState(0);
   const [sheet, setSheet] = useState<Sheet>("half"); const [place, setPlace] = useState<LatLng | null>(null); const [listSize, setListSize] = useState(30);
   const handle = useRef<RendererHandle | null>(null); const root = useRef<HTMLDivElement>(null);
   const today = useMemo(riyadhToday, []);
@@ -158,7 +165,7 @@ function MapWorkspace() {
     if (draft.tool === "measure") { setMeasure(draft.points); setDraft(null); setTool("browse"); return; }
     if (draft.points.length < 3) { setNotice("An area needs at least three points."); return; }
     if (draft.tool === "draw_area") update({ searchArea: { kind: "polygon", ring: draft.points }, filterToArea: true });
-    else update({ siteOutline: draft.points });
+    else { update({ siteOutline: draft.points }); setOutlineOrigin({ source: "user_drawn" }); }
     setDraft(null); setTool("browse");
   }, [draft, update]);
   const addCentreVertex = () => { const c = handle.current?.center(); if (c) onMapClick(c); };
@@ -194,7 +201,7 @@ function MapWorkspace() {
     setSavingOutline(true); setError("");
     try {
       const p = await getProperty(analysisId);
-      const outline = { ...polygonFromLatLngs(ws.siteOutline), source: "user_drawn", cadastral: false, drawn_on: today,
+      const outline = { ...polygonFromLatLngs(ws.siteOutline), source: outlineOrigin.source, ...(outlineOrigin.url ? { source_url: outlineOrigin.url } : {}), cadastral: false, drawn_on: today,
         basemap: status?.provider === "esri" ? `esri:${ws.basemap}` : "osm:roadmap", approximate_area_sqm: Math.round(geodesicAreaSqm(ws.siteOutline)) };
       const saved = await saveProperty(analysisId, { ...p.property, location: { ...p.property.location, site_outline: outline } }, p.revision, "Site outline drawn on map (approximate; not a cadastral boundary)");
       setPropertyRevision(saved.revision); setGeometrySaves(n => n + 1); setNotice("Outline saved to the property."); setReload(n => n + 1);
@@ -203,7 +210,7 @@ function MapWorkspace() {
   const openProperty = useCallback((r: MapRecord) => { analysisUrl(r.entity_id); go("valuation"); }, [analysisUrl, go]);
   // Search results only move the map; the user drops and confirms the pin (keeps geocoding within free, not-stored use).
   const onPlace = (p: LatLng) => { setPlace(p); handle.current?.fit([p], 17); };
-  const onCoordinates = (p: LatLng) => { setSubject({ coordinates: p, source: "coordinate_entry", precision: "user_selected", confirmed: false }); setPlace(null); handle.current?.fit([p], 18); go("subject"); };
+  const onCoordinates = (p: LatLng) => { setSubject({ coordinates: p, source: "coordinate_entry", precision: "user_selected", confirmed: false }); setPlace(null); setTool("browse"); handle.current?.fit([p], 18); go("subject"); };
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(""), 5000); return () => clearTimeout(t); }, [notice]);
 
   const draftMeasure = draft?.tool === "measure" ? pathLengthMeters(draft.points) : draft && draft.points.length >= 3 ? geodesicAreaSqm(draft.points) : null;
@@ -218,6 +225,44 @@ function MapWorkspace() {
   const analysisName = prepared?.property_name || ws.subject?.label || "Valuation";
   const nameMatch = analysisName.match(/^(.*) · (-?\d+\.\d+, -?\d+\.\d+)$/);
   const analysisTitle = nameMatch ? { title: nameMatch[1], place: nameMatch[2] } : { title: analysisName, place: "" };
+
+  // Look up the building under the pin as soon as it is dropped. Only fills blanks; never a land parcel.
+  const pinKey = ws.subject ? ws.subject.coordinates.map(n => n.toFixed(5)).join(",") : "";
+  useEffect(() => {
+    if (!pinKey || view !== "flow") return;
+    if (footprint?.key === pinKey && footprint.status !== "error" && footprintTry === 0) return;
+    const controller = new AbortController(); const [lat, lng] = pinKey.split(",").map(Number);
+    const timer = setTimeout(() => { setFootprint({ key: pinKey, status: "loading" });
+      getFootprint(lat, lng, { signal: controller.signal }).then(d => setFootprint({ key: pinKey, status: d.found ? "found" : "none", data: d }))
+        .catch(e => { if ((e as Error).name !== "AbortError") setFootprint({ key: pinKey, status: "error", error: errorText(e) }); }); }, 500);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [pinKey, view, footprintTry]); // eslint-disable-line react-hooks/exhaustive-deps
+  const subjectType = ws.subjectType || prepared?.property_type || null;
+  const siteArea = ws.siteOutline ? Math.round(geodesicAreaSqm(ws.siteOutline)) : null;
+  const fpData = footprint?.status === "found" && footprint.key === pinKey ? footprint.data : null;
+  // The area handed to the valuation, with where it came from. Unit types (apartment, office) are never filled from a building.
+  const areaSuggestion = useMemo(() => {
+    if (!subjectType) return null;
+    if (subjectType === "land") return siteArea ? { value: siteArea, as_of: today, source: outlineOrigin.source === "openstreetmap"
+      ? `Outline from OpenStreetMap (${outlineOrigin.url}), approximate, not cadastral` : "Plot traced on the map, approximate, not cadastral" } : null;
+    if (!BUILDING_TYPES.has(subjectType) || !fpData?.area_sqm) return null;
+    const footprintArea = Math.round(fpData.area_sqm);
+    return fpData.levels ? { value: footprintArea * fpData.levels, as_of: today, estimated: true, source: `Estimate: OpenStreetMap footprint ${n0.format(footprintArea)} m² × ${fpData.levels} mapped floors (${fpData.osm?.url})` }
+      : { value: footprintArea, as_of: today, estimated: true, source: `OpenStreetMap building footprint, ground floor only; floors not mapped (${fpData.osm?.url})` };
+  }, [subjectType, siteArea, fpData, outlineOrigin, today]);
+  const useFootprintOutline = () => { if (!fpData?.ring) return; update({ siteOutline: fpData.ring }); setOutlineOrigin({ source: "openstreetmap", url: fpData.osm?.url }); };
+  const footprintRow = !ws.subject ? null : footprint?.key !== pinKey || footprint.status === "loading"
+    ? <Row label="Looking for the building…" detail="Checking OpenStreetMap for an outline under the pin" leading={<span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0071E3] border-t-transparent" />} />
+    : footprint.status === "error" ? <Row label="Couldn’t check for a building" detail={footprint.error} value={<button type="button" className="text-[14px] text-[#0062C4]" onClick={() => setFootprintTry(n => n + 1)}>Try again</button>} />
+    : fpData ? <><Row label={`Building · ${n0.format(Math.round(fpData.area_sqm!))} m² footprint`} leading={<EvidenceKey kind="property" />}
+        detail={[fpData.match === "nearest" ? `${fpData.distance_m} m from the pin` : "Under the pin", fpData.levels ? `${fpData.levels} floors mapped` : "floors not mapped", "OpenStreetMap, approximate"].join(" · ")} />
+      {!(outlineOrigin.source === "openstreetmap" && ws.siteOutline) && <Row onClick={useFootprintOutline} label={<span className="text-[#0062C4]">Use as the site outline</span>} />}</>
+    : <Row label="No building mapped here" detail="For land, trace the plot to measure it." value={<button type="button" className="text-[14px] font-medium text-[#0062C4]" onClick={() => startTool("draw_site")}>Trace the plot</button>} />;
+  const areaRow = !subjectType ? null : areaSuggestion
+    ? <Row label={`Area · ${n0.format(areaSuggestion.value)} m²`} detail={`${areaSuggestion.estimated ? "Estimated" : "Measured"} from ${subjectType === "land" ? "the plot outline" : "the building outline"}. You can change it in the next step.`} />
+    : subjectType === "land" ? <Row label="Area" detail="Trace the plot on the map and its area fills in." value={<button type="button" className="text-[14px] font-medium text-[#0062C4]" onClick={() => startTool("draw_site")}>Trace the plot</button>} />
+    : BUILDING_TYPES.has(subjectType) ? <Row label="Area" detail="No building outline here. You’ll enter the area in the next step." />
+    : <Row label="Area" detail="Enter the unit’s own area in the next step. A building outline isn’t a unit’s area." />;
 
   // ── Card content ──────────────────────────────────────────────────────────
   const kinds = (["transaction", "listing", "property", "other", "market"] as const).filter(k => k === "transaction" || k === "listing" || k === "property" || listed.some(r => r.kind === k));
@@ -281,12 +326,14 @@ function MapWorkspace() {
         : <><Row label={ws.subject.confirmed ? "Location confirmed" : "Is the pin in the right place?"} detail={`${ws.subject.coordinates.map(n => n.toFixed(5)).join(", ")} · ${precisionLabel(ws.subject.precision)}`}
               leading={ws.subject.confirmed ? <Check size={18} className="text-[#34C759]" /> : <LocateFixed size={18} className="text-[#FF9F0A]" />} />
           {!ws.subject.confirmed && <div className="p-3"><PrimaryButton onClick={() => update(s => ({ subject: s.subject && { ...s.subject, confirmed: true } }))}>Confirm location</PrimaryButton></div>}
-          {!analysisId && <Row onClick={() => { setSubject(null); setTool("place_subject"); }} label={<span className="text-[#0071E3]">Move pin</span>} />}</>}
+          {!analysisId && <Row onClick={() => { setSubject(null); setTool("place_subject"); }} label={<span className="text-[#0071E3]">Move pin</span>} />}
+          {footprintRow}</>}
     </Section>
     {ws.subject?.confirmed && <Section title="2 · Property type">
       <div className="flex flex-wrap gap-2 p-3">{propertyTypes.map(t => <button key={t} type="button" onClick={() => update({ subjectType: t })} aria-pressed={ws.subjectType === t}
         className={`rounded-full px-3.5 py-1.5 text-[14px] ${ws.subjectType === t ? "bg-[#0071E3] text-white" : "bg-black/[0.05] text-black/75 active:bg-black/10"}`}>{label(t)}</button>)}</div>
     </Section>}
+    {ws.subject?.confirmed && ws.subjectType && <Section title="Area" footer={areaSuggestion ? areaSuggestion.source : undefined}>{areaRow}</Section>}
     {ws.subject?.confirmed && ws.subjectType && <Section title="3 · Approach" footer={method?.fields.length ? `You'll be asked for: ${method.fields.map(x => x.label.toLowerCase()).join(", ")}.` : undefined}>
       {methods.filter(m => m.implemented).map(m => <Row key={m.key} onClick={() => update({ approach: m.key })} label={m.label} detail={m.description}
         leading={<span className={`grid h-5 w-5 place-items-center rounded-full ${ws.approach === m.key ? "bg-[#0071E3] text-white" : "ring-1 ring-black/20"}`}>{ws.approach === m.key && <Check size={13} strokeWidth={3} />}</span>} />)}
@@ -305,7 +352,7 @@ function MapWorkspace() {
       <Row label="Approximate area" value={formatArea(geodesicAreaSqm(ws.siteOutline))} />
       <Row onClick={saveOutline} label={<span className="text-[#0071E3]">{savingOutline ? "Saving…" : "Save outline to property"}</span>} />
     </Section>}
-    <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} /></div>
+    <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} areaSuggestion={areaSuggestion} /></div>
   </>;
 
   const filters = <>
@@ -347,7 +394,7 @@ function MapWorkspace() {
   return <div ref={root} className="mizan-apple relative h-full w-full overflow-hidden bg-[#e8e6e1]">
     {hydrated && <MapRenderer key={imageryVersion} handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} basemap={ws.basemap} initialCamera={ws.camera}
       subject={ws.subject} subjectDraggable={!analysisId && !!ws.subject && !ws.subject.confirmed} searchArea={evidenceRing} editArea={editArea && !!ws.searchArea}
-      siteOutline={ws.siteOutline} placeMarker={place} tool={tool} draft={draft ?? (measure ? { tool: "measure", points: measure } : null)}
+      siteOutline={ws.siteOutline} footprint={view === "flow" && fpData?.ring && !(outlineOrigin.source === "openstreetmap" && ws.siteOutline) ? fpData.ring : null} placeMarker={place} tool={tool} draft={draft ?? (measure ? { tool: "measure", points: measure } : null)}
       onCamera={onCamera} onSelect={select} onGroup={setGroup} onMapClick={onMapClick} onSubjectMove={onSubjectMove} onAreaEdit={onAreaEdit} onStatus={onStatus} />}
 
     {/* The one card: sidebar on desktop, bottom sheet on phones. */}

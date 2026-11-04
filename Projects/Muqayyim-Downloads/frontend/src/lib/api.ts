@@ -253,5 +253,8 @@ export const saveAdjustments = (id: string, body: { expected_revision: number; r
 export const saveComparableAttributes = (entityId: string, attributes: ComparableAttributes, reason: string) => request<{ id: string; attributes: ComparableAttributes }>(`/api/v1/evidence/${entityId}/attributes`, { method: "PUT", body: JSON.stringify({ attributes, reason }) });
 export const importDemoComparables = (records: unknown[]) => request<{ inserted: number; duplicates: number; rejected_count: number; rejected: { index: number; title: string; reason: string }[] }>("/api/v1/evidence/demo", { method: "POST", body: JSON.stringify({ records }) });
 export const removeDemoComparables = () => request<{ removed: number }>("/api/v1/evidence/demo", { method: "DELETE" });
+export type Footprint = { found: boolean; reason?: string; kind?: "building"; match?: "contains" | "nearest"; distance_m?: number; ring?: [number, number][]; area_sqm?: number;
+  levels?: number | null; building?: string | null; name?: string | null; osm?: { type: string; id: number; url: string }; source: string; fetched_at: string; notice: string };
+export const getFootprint = (lat: number, lng: number, init?: { signal?: AbortSignal }) => request<Footprint>(`/api/v1/footprint?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`, init);
 export const calculateAnalysis = (id: string, expected_revision: number) => request<AnalysisResult>(`/api/v1/analysis/${id}/runs`, { method: "POST", body: JSON.stringify({ expected_revision }) });
 export const getAnalysisRuns = (id: string) => request<{ id: string; created_at: string; data: AnalysisResult }[]>(`/api/v1/analysis/${id}/runs`);

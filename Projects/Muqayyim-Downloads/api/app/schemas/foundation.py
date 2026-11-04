@@ -17,7 +17,8 @@ class SiteOutline(StrictModel):
     """GeoJSON (RFC 7946) polygon. Positions are [longitude, latitude], unlike map records."""
     type: Literal['Polygon'] = 'Polygon'
     coordinates: list[list[list[float]]] = Field(min_length=1, max_length=1)
-    source: Literal['user_drawn'] = 'user_drawn'
+    source: Literal['user_drawn', 'openstreetmap'] = 'user_drawn'
+    source_url: str | None = Field(None, max_length=300)
     cadastral: Literal[False] = False
     drawn_on: date
     basemap: str | None = Field(None, max_length=50)
