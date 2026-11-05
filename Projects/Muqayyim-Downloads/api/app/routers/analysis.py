@@ -107,7 +107,7 @@ async def save_adjustments(property_id: uuid.UUID, body: SaveAdjustments,
     await advance_revision(db, p, body.expected_revision, {'data': data})
     await save_snapshot(db, p, 'Comparable adjustments: '+body.reason, user)
     await log_action(db, 'property', p.id, 'comparable_adjustments_saved', user['id'],
-                     {'revision': p.revision, 'lines': len(setup['lines']), 'excluded': len(setup['exclusions'])})
+                     {'revision': p.revision, 'lines': len(setup['lines']), 'excluded': len(setup['exclusions']), 'picked': None if setup['selected'] is None else len(setup['selected'])})
     return await prepare(db, p, user)
 
 

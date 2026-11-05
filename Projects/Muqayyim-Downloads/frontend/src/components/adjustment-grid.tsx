@@ -77,7 +77,8 @@ export default function AdjustmentGrid({ propertyId, prepared, disabled, onSaved
     if (problems) { setError(`${problems} ${problems === 1 ? "item needs" : "items need"} attention before saving. Fix the highlighted fields, or remove them.`); return; }
     setBusy(true);
     try {
-      const clean = { ...setup, lines: setup.lines.filter(l => !untouched(l)) };
+      // The pick is owned by the Comparables section; keep whatever is saved now.
+      const clean = { ...setup, selected: prepared.adjustment_setup?.selected ?? null, lines: setup.lines.filter(l => !untouched(l)) };
       const p = await saveAdjustments(propertyId, { expected_revision: prepared.revision, reason: `Reviewed comparable adjustments: ${clean.rules.length} rule(s), ${clean.lines.length} line(s), ${Object.keys(clean.exclusions).length} exclusion(s)`, adjustments: clean });
       setBase(JSON.stringify({ ...EMPTY, ...(p.adjustment_setup || {}) })); setTried(false); onSaved(p);
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }

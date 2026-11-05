@@ -175,6 +175,12 @@ class ComparableAttributes(StrictModel):
     grade: Literal['C', 'B', 'A', 'A+'] | None = None
     street_width_m: float | None = Field(None, ge=0)
     corner: bool | None = None
+    frontages: int | None = Field(None, ge=1, le=4)
+    frontage_m: float | None = Field(None, ge=0)
+    use: Literal['residential', 'commercial', 'mixed', 'industrial', 'agricultural', 'other'] | None = None
+
+
+MAX_PICKED = 6
 
 
 class AdjustmentSetup(StrictModel):
@@ -186,9 +192,13 @@ class AdjustmentSetup(StrictModel):
     weighting_rationale: str | None = Field(None, max_length=1000)
     conclusion_basis: Literal['median', 'mean', 'weighted_mean', 'weighted_median'] = 'median'
     exclusions: dict[str, str] = Field(default_factory=dict)
+    # The sales the valuer picked (3 to 6). None means every eligible sale, as before picking existed.
+    selected: list[str] | None = Field(None, max_length=MAX_PICKED)
 
     @model_validator(mode='after')
     def consistent(self):
+        if self.selected is not None and len(set(self.selected)) != len(self.selected):
+            raise ValueError('A sale can be picked only once')
         if any(w < 0 for w in self.manual_weights.values()):
             raise ValueError('Comparable weights cannot be negative')
         if any(len(reason.strip()) < 3 for reason in self.exclusions.values()):

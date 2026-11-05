@@ -188,3 +188,9 @@ Running `next dev` against the default `.next` overwrote the production build se
 1. Owner: create a billing-enabled Google Cloud project, enable Maps JavaScript API + Geocoding API, create a referrer-restricted browser key, put it in `Projects/Muqayyim-Downloads/frontend/.env.local` as `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=…`, rebuild and restart. Then verify satellite/hybrid/terrain, geocoding and Street View at a Saudi location and record results here.
 2. Update `docs/verify_map_ui.py` / `verify_recheck_ui.py` / `verify_map_workflow_ui.py` to the new labels.
 3. Roadmap step 3–4: foundation/provenance gaps, then the professional comparables adjustment engine and reconciliation.
+
+## 2026-11-05 · Pick comparables and full comparables table
+- Sales comparison: the valuer can pick 3–6 usable sales (`adjustments.selected`, max 6, unique). With a pick, only those sales are analysed, calculated and stored in runs; without one, every usable sale is used as before. Picked sales that stop being usable raise a gap.
+- New reviewed comparable details: `frontages` (1–4), `frontage_m`, `use`. Analysis rows carry descriptive `details` (city, district, type, evidence type, price, source); they never enter the arithmetic.
+- Frontend: `components/comparable-picker.tsx` (Comparables section before Adjust comparables; "See all details" opens a table: #, type, city, district, area, rate/m², value, frontages, frontage width, street width, corner, comparable type, date, use, source, distance, adjusted rate; missing details editable in place). Subtle fade/rise animation, off with reduced motion.
+- Checks: 138 backend, 24 frontend, lint, build; browser check on a disposable DB with 8 synthetic DEMO land sales (picked 4 → median 3,273 SAR/m²; frontages added in the table saved, demo flag kept).

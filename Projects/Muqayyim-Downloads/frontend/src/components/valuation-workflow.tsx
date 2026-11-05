@@ -6,6 +6,7 @@ import { ComparableAttributes, PreparedAnalysis, RuleFactor, SubjectAttributes, 
 
 import SensitivityTable from "./sensitivity-table";
 import AdjustmentGrid, { AttributeInput } from "./adjustment-grid";
+import ComparablePicker from "./comparable-picker";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
@@ -158,13 +159,16 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
 
     {/* Everything else is one tap away. */}
     <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.05]">
-      {method === "sales_comparison" && grid && <Disclosure title="Adjust comparables" detail={applied ? `${applied} applied` : `${grid.rows.length} sales`}>
-        <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} /></Disclosure>}
-      <Disclosure title="Evidence used" detail={method === "sales_comparison" ? `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable` : `${prepared.candidates.length} nearby`} defaultOpen={method === "sales_comparison" && !grid}>
+      {method === "sales_comparison" ? <Disclosure title="Comparables" detail={prepared.picking ? `${prepared.eligible_comparables.length} picked` : `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable`} defaultOpen={!grid}>
+        <ComparablePicker propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} />
+        <button type="button" className="mt-2 text-[13px] text-[#0071E3] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
+      </Disclosure> : <Disclosure title="Evidence used" detail={method === "sales_comparison" ? `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable` : `${prepared.candidates.length} nearby`} defaultOpen={method === "sales_comparison" && !grid}>
         <p className="text-[12.5px] text-black/50">Within {prepared.radius_km} km. Listings and draft, undated or repeated records are not used as achieved sales.</p>
         <div className="mt-2 max-h-56 divide-y divide-black/[0.05] overflow-auto">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block w-full py-1.5 text-left" onClick={() => onSelectEvidence(c.id)}><span className="block truncate text-[14px] text-black/80" dir="auto">{c.title}</span><span className={`block text-[12px] ${c.eligible ? "text-[#248a3d]" : "text-black/45"}`}>{c.distance_km} km · {c.eligible ? "Used" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="py-2 text-[13px] text-black/45">No located evidence within this radius.</p>}</div>
         <button type="button" className="mt-2 text-[13px] text-[#0071E3] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
-      </Disclosure>
+      </Disclosure>}
+      {method === "sales_comparison" && grid && <Disclosure title="Adjust comparables" detail={applied ? `${applied} applied` : `${grid.rows.length} sales`}>
+        <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} /></Disclosure>}
       {result && <Disclosure title="How this was calculated">
         <ul className="list-disc space-y-1 pl-4 text-[12.5px] text-black/55">{result.outputs.limitations.map(l => <li key={l}>{l}</li>)}</ul>
         <SensitivityTable sensitivity={result.outputs.sensitivity} />

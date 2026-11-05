@@ -157,6 +157,9 @@ def adjust_comparable(comp, lines, time_rule, as_of):
             'steps': steps, 'pending': pending, 'notes': notes}
 
 
+DETAILS = ('city', 'district', 'property_type', 'kind', 'evidence_type', 'price', 'currency', 'source', 'date_basis', 'coordinates')
+
+
 def analyse(eligible, setup, subject_area, as_of, subject=None):
     """Adjust eligible comparables and reconcile them to one unit value. Raises ValueError on invalid setups."""
     setup = setup or {}
@@ -172,6 +175,8 @@ def analyse(eligible, setup, subject_area, as_of, subject=None):
         derived, rule_notes = rule_lines(comp, setup.get('rules'), {l['factor'] for l in own if l['status'] == 'approved'}, subject, subject_area)
         trail = adjust_comparable(comp, own + derived, setup.get('time'), as_of)
         trail['notes'] = rule_notes + trail['notes']
+        # Descriptive details for the comparables table; they never enter the arithmetic.
+        trail['details'] = {k: comp.get(k) for k in DETAILS}
         if comp['id'] in exclusions:
             excluded.append({**trail, 'exclusion_reason': exclusions[comp['id']]})
         else:

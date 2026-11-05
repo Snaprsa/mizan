@@ -149,9 +149,19 @@ async def prepare(db, p, user, method=None, as_of=None, evidence=None):
     candidates.sort(key=lambda r: r['distance_km'])
     gaps = [f"{f['label']}: {f['error']}" for f in fields if f['error']]
     values = {f['key']: f['value'] for f in fields if f['value'] is not None}
-    if key == 'sales_comparison' and len(eligible) < 3:
-        gaps.append(f'Need at least 3 distinct, active, dated, nearby achieved transactions; found {len(eligible)}')
     adjustment_setup = (setup.get('adjustments') or None) if key == 'sales_comparison' else None
+    picked = (adjustment_setup or {}).get('selected')
+    if picked is not None:
+        # Only the sales the valuer picked are analysed; the rest stay visible as candidates.
+        for c in candidates: c['picked'] = c['id'] in picked
+        lost = [i for i in picked if i not in {c['id'] for c in eligible}]
+        eligible = [c for c in eligible if c['id'] in picked]
+        if lost:
+            gaps.append(f"{len(lost)} picked {'sale is' if len(lost) == 1 else 'sales are'} no longer usable; pick another")
+    eligible.sort(key=lambda r: r['distance_km'])
+    if key == 'sales_comparison' and len(eligible) < 3:
+        gaps.append(f'Pick at least 3 sales; {len(eligible)} picked' if picked is not None else
+                    f'Need at least 3 distinct, active, dated, nearby achieved transactions; found {len(eligible)}')
     adjustment_analysis = None
     if key == 'sales_comparison' and len(eligible) >= 3:
         try:
@@ -173,7 +183,7 @@ async def prepare(db, p, user, method=None, as_of=None, evidence=None):
         'as_of': as_of, 'radius_km': radius, 'lookback_days': lookback, 'fields': fields,
         'candidates': candidates, 'eligible_comparables': eligible, 'gaps': gaps, 'ready': not gaps,
         'coverage': evidence.get('coverage'),
-        'adjustment_setup': adjustment_setup, 'adjustment_analysis': adjustment_analysis,
+        'adjustment_setup': adjustment_setup, 'adjustment_analysis': adjustment_analysis, 'picking': picked is not None,
         'subject_attributes': subject_attributes(p), 'comparison_factors': COMPARISON_FACTORS.get(p.property_type, DEFAULT_COMPARISON_FACTORS),
         'calculation_version': VERSION,
         'calculation_status': 'ready' if not gaps else 'needs_inputs'}

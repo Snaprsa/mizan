@@ -188,3 +188,40 @@ async def test_subject_details_drive_rules_and_demo_is_flagged_in_the_result(cli
     run = (await client.post(path + '/runs', json={'expected_revision': p['revision']})).json()
     assert run['outputs']['value'] == pytest.approx(5000 * 1.04 * 100)
     assert any('synthetic demo' in l for l in run['outputs']['limitations']) and run['outputs']['evidence']['demo_comparables'] == 3
+
+
+@pytest.mark.asyncio
+async def test_valuer_picks_three_to_six_sales_and_only_those_are_used(client):
+    p = await start(client, 'sales_comparison'); path = '/api/v1/analysis/' + p['property_id']
+    p = (await client.put(path + '/inputs', json=payload(p, {'area_sqm': 500}))).json()
+    await seed_sales(client, p)
+    case_id = (await client.get('/api/v1/properties/' + p['property_id'])).json()['property']['case_id']
+    async with async_session() as db:
+        source = Source(case_id=uuid.UUID(case_id), source_type='url', url='https://example.com/adj/far')
+        db.add(source); await db.flush()
+        db.add(Comparable(case_id=uuid.UUID(case_id), source_id=source.id, property_title='Achieved far', property_type='land',
+            city='Riyadh', district='Al Narjis', latitude=24.705, longitude=46.7, evidence_type='transaction_achieved',
+            transacted_price=4000000, primary_area_sqm=500, transaction_date='2026-10-12', status='active',
+            attributes={'frontages': 2, 'frontage_m': 40, 'use': 'commercial'}))
+        await db.commit()
+    p = (await client.get(path)).json()
+    assert len(p['eligible_comparables']) == 4 and not p['picking'], 'without a pick every usable sale is used, as before'
+    ids = [c['id'] for c in p['eligible_comparables']]
+    assert [c['distance_km'] for c in p['eligible_comparables']] == sorted(c['distance_km'] for c in p['eligible_comparables'])
+    far = next(c['id'] for c in p['eligible_comparables'] if c['title'] == 'Achieved far')
+    pick = lambda rev, selected: client.put(path + '/adjustments', json={'expected_revision': rev, 'reason': 'Picked sales',
+                                                                          'adjustments': {'selected': selected}})
+    assert (await pick(p['revision'], ids[:1] * 2)).status_code == 422, 'a sale cannot be picked twice'
+    assert (await pick(p['revision'], ids + ['a', 'b', 'c'])).status_code == 422, 'at most six sales'
+    two = (await pick(p['revision'], [i for i in ids if i != far][:2])).json()
+    assert not two['ready'] and any('Pick at least 3 sales; 2 picked' in g for g in two['gaps'])
+    three = (await pick(two['revision'], [i for i in ids if i != far])).json()
+    assert three['picking'] and three['ready'] and len(three['eligible_comparables']) == 3
+    assert {c['id']: c.get('picked') for c in three['candidates']}[far] is False
+    assert three['adjustment_analysis']['concluded_sar_sqm'] == 2000
+    with_far = (await pick(three['revision'], [far] + [i for i in ids if i != far][:2])).json()
+    row = next(r for r in with_far['adjustment_analysis']['rows'] if r['id'] == far)
+    assert row['details']['district'] == 'Al Narjis' and row['details']['price'] == 4000000 and row['details']['kind'] == 'transaction'
+    assert row['attributes']['use'] == 'commercial' and row['attributes']['frontages'] == 2
+    run = (await client.post(path + '/runs', json={'expected_revision': with_far['revision']})).json()
+    assert {c['id'] for c in run['comparables']} == {far, *[i for i in ids if i != far][:2]}
