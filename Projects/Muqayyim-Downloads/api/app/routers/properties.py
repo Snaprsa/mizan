@@ -1,6 +1,7 @@
 """Permanent property workspaces linked to the existing comparable case workflow."""
 import re
 import uuid
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from api.app.auth import get_current_user
 from api.app.audit import log_action
 from api.app.database import get_db
 from api.app.models.foundation import Property, PropertyRevision, PropertyAssumption
+from api.app.models.monitor import Portfolio, PortfolioAsset
 from api.app.schemas.foundation import PropertyInput, PropertyUpdate, AssumptionUpdate, CaseLink
 from api.app.services.foundation import (owner_id, can_write, owned_property, validate_case,
     search_columns, property_response, save_snapshot, advance_revision)
@@ -18,8 +20,9 @@ router = APIRouter(prefix='/properties', tags=['Properties'])
 @router.get('')
 async def list_properties(q: str = Query('', max_length=255), city: str | None = None,
         property_type: str | None = None, limit: int = Query(50, ge=1, le=200),
-        offset: int = Query(0, ge=0), db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
-    filters = [Property.created_by == owner_id(user), Property.is_demo.is_(False)]
+        offset: int = Query(0, ge=0), deleted: bool = False, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    filters = [Property.created_by == owner_id(user), Property.is_demo.is_(False),
+               Property.deleted_at.is_not(None) if deleted else Property.deleted_at.is_(None)]
     if q:
         filters.append(or_(*(c.icontains(q, autoescape=True) for c in
             [Property.name, Property.city, Property.district, Property.address, Property.plot_number])))
@@ -32,7 +35,7 @@ async def list_properties(q: str = Query('', max_length=255), city: str | None =
                              .limit(limit).offset(offset))).all()
     return {'data': [{'id': str(p.id), 'name': p.name, 'city': p.city, 'district': p.district,
         'property_type': p.property_type, 'revision': p.revision, 'case_id': p.case_id,
-        'updated_at': p.updated_at} for p in rows], 'total': total}
+        'updated_at': p.updated_at, 'deleted_at': p.deleted_at} for p in rows], 'total': total}
 
 
 @router.post('', status_code=201)
@@ -63,6 +66,29 @@ async def replace_property(property_id: uuid.UUID, body: PropertyUpdate,
     await advance_revision(db, p, body.expected_revision, {'data': data, **search_columns(data)})
     await save_snapshot(db, p, body.reason, user)
     await log_action(db, 'property', p.id, 'updated', user['id'], {'revision': p.revision, 'reason': body.reason})
+    return await property_response(db, p)
+
+
+@router.delete('/{property_id}')
+async def delete_property(property_id: uuid.UUID, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    """Hide a saved property. Nothing is erased: revisions, valuations and the audit trail stay, and it can be restored."""
+    can_write(user)
+    p = await owned_property(db, property_id, user)
+    held = await db.scalar(select(func.count()).select_from(PortfolioAsset).join(Portfolio, Portfolio.id == PortfolioAsset.portfolio_id)
+                           .where(PortfolioAsset.property_id == p.id, Portfolio.is_demo.is_(False)))
+    if held:
+        raise HTTPException(409, 'This property is in a Monitor portfolio. Remove it from the portfolio first.')
+    p.deleted_at = datetime.utcnow()
+    await log_action(db, 'property', p.id, 'deleted', user['id'], {'revision': p.revision, 'name': p.name})
+    return {'id': str(p.id), 'deleted_at': p.deleted_at}
+
+
+@router.post('/{property_id}/restore')
+async def restore_property(property_id: uuid.UUID, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    can_write(user)
+    p = await owned_property(db, property_id, user, include_deleted=True)
+    p.deleted_at = None
+    await log_action(db, 'property', p.id, 'restored', user['id'], {'revision': p.revision})
     return await property_response(db, p)
 
 

@@ -25,6 +25,8 @@ class Property(Base):
     is_demo = Column(Boolean, nullable=False, default=False, server_default=false(), index=True)  # Demo portfolio only; never on the map or in Properties.
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    # Deleting hides a property; its revisions, valuations and audit trail are kept and it can be restored.
+    deleted_at = Column(DateTime, nullable=True, index=True)
 
 
 class PropertyRevision(Base):

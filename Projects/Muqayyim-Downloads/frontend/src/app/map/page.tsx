@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronRight, Circle, Expand, Hexagon, Layers, LocateFixed, Map as MapIcon, Menu, Minus, PencilRuler, Plus, Ruler, Scan, Shrink, SlidersHorizontal, Square, Table2, X } from "lucide-react";
-import { getFootprint, getMapRecords, getProperty, saveProperty, type Footprint, getValuationCatalog, startMapAnalysis, type MapRecord, type MapResponse, type PreparedAnalysis, type ValuationMethod } from "@/lib/api";
+import { deleteProperty, getFootprint, getMapRecords, getProperty, saveProperty, type Footprint, getValuationCatalog, startMapAnalysis, type MapRecord, type MapResponse, type PreparedAnalysis, type ValuationMethod } from "@/lib/api";
 import ValuationWorkflow, { MAP_SOURCE } from "@/components/valuation-workflow";
 import { MAX_PICK, MIN_PICK, pickChanged, savePick, togglePick } from "@/components/comparable-picker";
 import { areaPoints, formatArea, formatDistance, geodesicAreaSqm, haversineMeters, inSearchArea, latLngsFromPolygon, pathLengthMeters, polygonFromLatLngs, type GeoJSONPolygon, type LatLng, type SearchArea } from "@/lib/geo";
@@ -211,6 +211,14 @@ function MapWorkspace() {
     } catch (e) { setError((e as Error).message); } finally { setSavingOutline(false); }
   }
   const openProperty = useCallback((r: MapRecord) => { analysisUrl(r.entity_id); go("valuation"); }, [analysisUrl, go]);
+  // Deleting a saved property hides it; Properties › Deleted restores it.
+  const [confirmDelete, setConfirmDelete] = useState(false); const [deleting, setDeleting] = useState(false); const [deleteError, setDeleteError] = useState("");
+  useEffect(() => { setConfirmDelete(false); setDeleteError(""); }, [ws.selectedId]);
+  async function removeProperty(r: MapRecord) {
+    setDeleting(true); setDeleteError("");
+    try { await deleteProperty(r.entity_id); update({ selectedId: null }); setReload(n => n + 1); }
+    catch (e) { setDeleteError(errorText(e)); } finally { setDeleting(false); }
+  }
   // Search results only move the map; the user drops and confirms the pin (keeps geocoding within free, not-stored use).
   const onPlace = (p: LatLng) => { setPlace(p); handle.current?.fit([p], 17); };
   const onCoordinates = (p: LatLng) => { setSubject({ coordinates: p, source: "coordinate_entry", precision: "user_selected", confirmed: false }); setPlace(null); setTool("browse"); handle.current?.fit([p], 18); go("subject"); };
@@ -353,6 +361,12 @@ function MapWorkspace() {
       {selected.kind === "property" && <Row onClick={() => openProperty(selected)} label={<span className="text-[#0071E3]">Value this property</span>} />}
       <Row onClick={() => router.push(selected.href)} chevron label={`Open ${selected.kind === "property" ? "property" : selected.kind === "market" ? "market data" : "evidence"}`} />
     </Section>
+    {selected.kind === "property" && <Section footer={confirmDelete ? "It disappears from the map and lists. Its history and saved valuations are kept, and you can restore it from Properties › Deleted." : undefined}>
+      {!confirmDelete ? <Row onClick={() => setConfirmDelete(true)} label={<span className="text-[#C0271B]">Delete property</span>} />
+        : <><Row onClick={() => removeProperty(selected)} label={<span className="font-semibold text-[#C0271B]">{deleting ? "Deleting…" : `Delete “${selected.title}”`}</span>} />
+          <Row onClick={() => setConfirmDelete(false)} label="Cancel" /></>}
+      {deleteError && <p role="alert" className="px-4 pb-3 text-[12.5px] text-[#C0271B]">{deleteError}</p>}
+    </Section>}
   </>;
 
   const flow = <>

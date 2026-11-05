@@ -288,3 +288,18 @@ async def test_preview_calculates_an_unsaved_grid_without_saving(client):
     assert row['adjusted_sar_sqm'] == pytest.approx(row['raw_sar_sqm'] * 0.9)
     after = (await client.get(path)).json()
     assert after['revision'] == p['revision'] and not (after['adjustment_setup'] or {}).get('lines'), 'preview must not save'
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_property_hides_it_keeps_its_history_and_can_be_undone(client):
+    p = await start(client, 'sales_comparison'); pid = p['property_id']
+    assert (await client.delete('/api/v1/properties/' + pid)).status_code == 200
+    assert (await client.get('/api/v1/properties/' + pid)).status_code == 404
+    assert all(r['id'] != pid for r in (await client.get('/api/v1/properties')).json()['data'])
+    assert all(r['id'] != 'property:' + pid for r in (await client.get('/api/v1/map/records')).json()['data'])
+    deleted = (await client.get('/api/v1/properties?deleted=true')).json()['data']
+    assert [r['id'] for r in deleted] == [pid] and deleted[0]['deleted_at']
+    restored = await client.post(f'/api/v1/properties/{pid}/restore')
+    assert restored.status_code == 200
+    assert (await client.get('/api/v1/properties/' + pid)).status_code == 200
+    assert (await client.get(f'/api/v1/properties/{pid}/revisions')).json(), 'history is kept through delete and restore'

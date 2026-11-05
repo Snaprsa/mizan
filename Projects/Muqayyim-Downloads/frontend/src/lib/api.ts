@@ -170,8 +170,11 @@ export type PropertyWorkspace = {
   assumptions: Record<string, Assumption>; created_at: string; updated_at: string;
 };
 export type PropertySummary = { id: string; name: string; city: string | null; district: string | null;
-  property_type: string | null; revision: number; case_id: string | null; updated_at: string };
-export const listProperties = (q = "", offset = 0) => request<{ data: PropertySummary[]; total: number }>(`/api/v1/properties?q=${encodeURIComponent(q)}&offset=${offset}`);
+  property_type: string | null; revision: number; case_id: string | null; updated_at: string; deleted_at?: string | null };
+export const listProperties = (q = "", offset = 0, deleted = false) => request<{ data: PropertySummary[]; total: number }>(`/api/v1/properties?q=${encodeURIComponent(q)}&offset=${offset}${deleted ? "&deleted=true" : ""}`);
+/** Hides a property; its history and valuations are kept and it can be restored. */
+export const deleteProperty = (id: string) => request<{ id: string; deleted_at: string }>(`/api/v1/properties/${id}`, { method: "DELETE" });
+export const restoreProperty = (id: string) => request<unknown>(`/api/v1/properties/${id}/restore`, { method: "POST" });
 export const createProperty = (property: PropertyInput) => request<PropertyWorkspace>("/api/v1/properties", { method: "POST", body: JSON.stringify(property) });
 export const getProperty = (id: string) => request<PropertyWorkspace>(`/api/v1/properties/${id}`);
 export const saveProperty = (id: string, property: PropertyInput, expected_revision: number, reason: string) => request<PropertyWorkspace>(`/api/v1/properties/${id}`, { method: "PUT", body: JSON.stringify({ property, expected_revision, reason }) });

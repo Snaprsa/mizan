@@ -17,8 +17,11 @@ def can_write(user):
         raise HTTPException(403, 'This role cannot change analysis inputs')
 
 
-async def owned_property(db, property_id, user):
-    p = await db.scalar(select(Property).where(Property.id == property_id, Property.created_by == owner_id(user)))
+async def owned_property(db, property_id, user, include_deleted=False):
+    q = select(Property).where(Property.id == property_id, Property.created_by == owner_id(user))
+    if not include_deleted:
+        q = q.where(Property.deleted_at.is_(None))
+    p = await db.scalar(q)
     if p is None:
         raise HTTPException(404, 'Property not found')
     return p
