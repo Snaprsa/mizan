@@ -20,27 +20,34 @@ const EVIDENCE: Record<string, string> = { transaction_achieved: "Transaction", 
 const USES = ["residential", "commercial", "mixed", "industrial", "agricultural", "other"] as const;
 const sourceText = (s: string) => /^https?:\/\//.test(s) ? new URL(s).hostname.replace(/^www\./, "") : s;
 
-type Props = { propertyId: string; prepared: PreparedAnalysis; disabled: boolean; onSaved: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void; onEvidenceChanged: () => void };
+/** Add or remove one sale from an unsaved pick, never beyond the maximum. */
+export const togglePick = (list: string[], id: string) => list.includes(id) ? list.filter(x => x !== id) : list.length >= MAX_PICK ? list : [...list, id];
+export const pickChanged = (draft: string[], prepared: PreparedAnalysis | null) => JSON.stringify([...draft].sort()) !== JSON.stringify([...(prepared?.adjustment_setup?.selected ?? [])].sort());
+/** Save the pick (or null for every usable sale) as a new property revision. */
+export function savePick(propertyId: string, prepared: PreparedAnalysis, selected: string[] | null) {
+  const reason = selected ? `Picked ${selected.length} comparable sales` : "Use every usable sale";
+  return saveAdjustments(propertyId, { expected_revision: prepared.revision, reason, adjustments: { ...EMPTY, ...(prepared.adjustment_setup || {}), selected } });
+}
 
-export default function ComparablePicker({ propertyId, prepared, disabled, onSaved, onSelectEvidence, onEvidenceChanged }: Props) {
+type Props = { propertyId: string; prepared: PreparedAnalysis; disabled: boolean; onSaved: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void; onEvidenceChanged: () => void;
+  /** The unsaved pick, shared with the map so a pin can be picked too. */
+  chosen: string[]; onChosen: (ids: string[]) => void };
+
+export default function ComparablePicker({ propertyId, prepared, disabled, onSaved, onSelectEvidence, onEvidenceChanged, chosen, onChosen }: Props) {
   const usable = useMemo(() => prepared.candidates.filter(c => c.eligible).sort((a, b) => a.distance_km - b.distance_km), [prepared.candidates]);
   const unusable = prepared.candidates.filter(c => !c.eligible);
   const saved = prepared.adjustment_setup?.selected ?? null;
-  const savedKey = JSON.stringify(saved);
-  const [chosen, setChosen] = useState<string[]>(saved ?? []);
-  useEffect(() => { setChosen(saved ?? []); }, [savedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [table, setTable] = useState(false);
-  const changed = JSON.stringify([...chosen].sort()) !== JSON.stringify([...(saved ?? [])].sort());
+  const changed = pickChanged(chosen, prepared);
   const full = chosen.length >= MAX_PICK;
 
   async function store(selected: string[] | null) {
     setBusy(true); setError("");
     try {
-      const reason = selected ? `Picked ${selected.length} comparable sales` : "Use every usable sale";
-      onSaved(await saveAdjustments(propertyId, { expected_revision: prepared.revision, reason, adjustments: { ...EMPTY, ...(prepared.adjustment_setup || {}), selected } }));
+      onSaved(await savePick(propertyId, prepared, selected));
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
-  const toggle = (id: string) => setChosen(c => c.includes(id) ? c.filter(x => x !== id) : c.length >= MAX_PICK ? c : [...c, id]);
+  const toggle = (id: string) => onChosen(togglePick(chosen, id));
 
   // The table shows the sales the valuation uses now: the saved pick, or every usable sale before picking.
   const used = saved ? usable.filter(c => saved.includes(c.id)) : usable;
@@ -48,7 +55,7 @@ export default function ComparablePicker({ propertyId, prepared, disabled, onSav
 
   return <div className="space-y-3">
     <p className="text-[12.5px] leading-snug text-black/55">
-      {saved ? `This valuation uses the ${saved.length} sales you picked.` : usable.length ? `All ${usable.length} usable sales within ${prepared.radius_km} km are used. Pick ${MIN_PICK} to ${MAX_PICK} to use only those.` : `No usable sales within ${prepared.radius_km} km.`}
+      {saved ? `This valuation uses the ${saved.length} sales you picked. Tap a sale on the map to add or remove it.` : usable.length ? `All ${usable.length} usable sales within ${prepared.radius_km} km are used. Pick ${MIN_PICK} to ${MAX_PICK} here or by tapping sales on the map.` : `No usable sales within ${prepared.radius_km} km.`}
     </p>
     {usable.length > 0 && <button type="button" onClick={() => setTable(true)} className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-[#0062C4]"><Table2 size={15} />See all details of {saved ? "the picked" : "these"} sales</button>}
 

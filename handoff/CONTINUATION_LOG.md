@@ -194,3 +194,9 @@ Running `next dev` against the default `.next` overwrote the production build se
 - New reviewed comparable details: `frontages` (1–4), `frontage_m`, `use`. Analysis rows carry descriptive `details` (city, district, type, evidence type, price, source); they never enter the arithmetic.
 - Frontend: `components/comparable-picker.tsx` (Comparables section before Adjust comparables; "See all details" opens a table: #, type, city, district, area, rate/m², value, frontages, frontage width, street width, corner, comparable type, date, use, source, distance, adjusted rate; missing details editable in place). Subtle fade/rise animation, off with reduced motion.
 - Checks: 138 backend, 24 frontend, lint, build; browser check on a disposable DB with 8 synthetic DEMO land sales (picked 4 → median 3,273 SAR/m²; frontages added in the table saved, demo flag kept).
+
+## 2026-11-05 · Pick comparables from the map
+- In an open sales-comparison valuation, tapping a sale pin shows a card at the top of the sheet: Pick this sale / Remove, the picked count, and "Use these N in the valuation" once 3–6 are picked. Pins that can't be picked say why (outside the search radius, not an achieved sale, or the eligibility reasons).
+- The unsaved pick lives in the map page and is shared with the Comparables section, so ticking in either place stays in sync. Picked sales are filled blue and numbered on the map in the same nearest-first order as the comparables table.
+- Files: `app/map/page.tsx`, `components/comparable-picker.tsx` (togglePick/pickChanged/savePick, controlled pick), `valuation-workflow.tsx`, `map/markers.ts`, `map/map-renderer.tsx`, `map/types.ts`, `globals.css`.
+- Checks: 138 backend, 24 frontend, lint, build; browser check on disposable DB (picked a 5th sale from its pin, value moved from SAR 10,473,600 to 11,280,000 = median 3,525 × 3,200 m²).

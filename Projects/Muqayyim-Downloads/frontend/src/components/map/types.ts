@@ -17,6 +17,8 @@ export type MapStatus = {
 
 export type RendererProps = {
   records: MapRecord[]; selectedId: string | null; groupIds: string[];
+  /** Sales picked for the open valuation, numbered as in the comparables table. */
+  picked?: Record<string, number>;
   basemap: Basemap; initialCamera: Camera | null;
   subject: Subject | null; subjectDraggable: boolean;
   searchArea: SearchArea | null; editArea: boolean; siteOutline: LatLng[] | null;

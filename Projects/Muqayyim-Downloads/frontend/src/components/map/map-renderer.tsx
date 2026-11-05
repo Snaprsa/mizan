@@ -78,7 +78,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
     const p = live.current; group.clearLayers();
     const items = p.records.filter(r => r.coordinates).map(r => { const px = m.project(r.coordinates!, m.getZoom()); return { record: r, coordinates: r.coordinates as LatLng, x: px.x, y: px.y }; });
     for (const cluster of clusterProjected<MapRecord>(items)) {
-      const el = evidenceMarker(cluster, p.selectedId, p.groupIds, m.getZoom() >= 17);
+      const el = evidenceMarker(cluster, p.selectedId, p.groupIds, m.getZoom() >= 17, p.picked);
       L.marker(cluster.center, { icon: icon(el), keyboard: false }).addTo(group);
       L.DomEvent.disableClickPropagation(el);
       el.addEventListener("click", () => {
@@ -154,7 +154,7 @@ const MapRenderer = forwardRef<RendererHandle, RendererProps>(function MapRender
   }
 
   useEffect(() => { drawTiles(); }, [props.basemap]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { drawEvidence(); }, [props.records, props.selectedId, props.groupIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { drawEvidence(); }, [props.records, props.selectedId, props.groupIds, props.picked]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { drawShapes(); }, [props.searchArea, props.editArea, props.siteOutline, props.editOutline, props.footprint, props.draft, props.placeMarker]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { drawSubject(); }, [props.subject, props.subjectDraggable]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const m = map.current; if (!m) return; m.getContainer().style.cursor = props.tool === "browse" ? "" : "crosshair";

@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronRight, Circle, Expand, Hexagon, Layers, LocateFixed, Map as MapIcon, Menu, Minus, PencilRuler, Plus, Ruler, Scan, Shrink, SlidersHorizontal, Square, Table2, X } from "lucide-react";
 import { getFootprint, getMapRecords, getProperty, saveProperty, type Footprint, getValuationCatalog, startMapAnalysis, type MapRecord, type MapResponse, type PreparedAnalysis, type ValuationMethod } from "@/lib/api";
 import ValuationWorkflow, { MAP_SOURCE } from "@/components/valuation-workflow";
+import { MAX_PICK, MIN_PICK, pickChanged, savePick, togglePick } from "@/components/comparable-picker";
 import { areaPoints, formatArea, formatDistance, geodesicAreaSqm, haversineMeters, inSearchArea, latLngsFromPolygon, pathLengthMeters, polygonFromLatLngs, type GeoJSONPolygon, type LatLng, type SearchArea } from "@/lib/geo";
 import { applyEvidenceFilters, evidenceSummaries, facetValues, LAYER, LAYERS, riyadhToday, sourceLabel, UNAVAILABLE_LAYERS } from "@/lib/map-evidence";
 import { BASEMAPS, defaultState, loadState, saveState, type Basemap, type Camera, type Subject, type WorkspaceState } from "@/lib/map-workspace-state";
@@ -231,6 +232,24 @@ function MapWorkspace() {
   // Look up the building under the pin as soon as it is dropped. Only fills blanks; never a land parcel.
   const pinKey = ws.subject ? ws.subject.coordinates.map(n => n.toFixed(5)).join(",") : "";
   const subjectType = ws.subjectType || prepared?.property_type || null;
+
+  // Picking comparables from the map. The unsaved pick is shared with the Comparables section of the card.
+  const salesMode = view === "analysis" && prepared?.method === "sales_comparison";
+  const savedPick = prepared?.adjustment_setup?.selected ?? null;
+  const [pickDraft, setPickDraft] = useState<string[]>([]);
+  const [pickBusy, setPickBusy] = useState(false); const [pickError, setPickError] = useState("");
+  useEffect(() => { setPickDraft(savedPick ?? []); setPickError(""); }, [analysisId, JSON.stringify(savedPick)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const picked = useMemo(() => {
+    if (!salesMode || !prepared) return {};
+    const order = prepared.candidates.filter(c => pickDraft.includes(c.id)).sort((a, b) => a.distance_km - b.distance_km);
+    return Object.fromEntries(order.map((c, i) => [c.id, i + 1])) as Record<string, number>;
+  }, [salesMode, prepared, pickDraft]);
+  async function storePick() {
+    if (!prepared || !analysisId) return;
+    setPickBusy(true); setPickError("");
+    try { await savePick(analysisId, prepared, pickDraft); setGeometrySaves(n => n + 1); }
+    catch (e) { setPickError(errorText(e)); } finally { setPickBusy(false); }
+  }
   const wantsFootprint = view === "flow" || (view === "analysis" && !!subjectType && BUILDING_TYPES.has(subjectType));
   useEffect(() => {
     if (!pinKey || !wantsFootprint) return;
@@ -363,15 +382,37 @@ function MapWorkspace() {
     {methods.some(m => !m.implemented) && ws.subjectType && <p className="px-5 pb-4 text-[12px] text-black/40">Not available yet: {methods.filter(m => !m.implemented).map(m => m.label).join(", ")}.</p>}
   </>;
 
+  const pinCandidate = salesMode && selected ? prepared!.candidates.find(c => c.id === selected.id) || null : null;
+  const pinPicked = !!selected && pickDraft.includes(selected.id);
+  const pickBar = salesMode && selected && selected.kind !== "property" && <div className="mizan-rise-in sticky top-0 z-20 mx-3 mb-3 rounded-2xl bg-white p-3.5 shadow-[0_6px_20px_rgba(0,0,0,0.10)] ring-1 ring-black/[0.06]" aria-live="polite">
+    <div className="flex items-start gap-3">
+      <EvidenceKey kind={selected.kind} />
+      <div className="min-w-0 flex-1"><p className="line-clamp-2 text-[14.5px] font-semibold leading-snug text-[#1D1D1F]" dir="auto">{selected.title.replace(/^DEMO · /, "")}</p>
+        <p className="text-[12.5px] text-[#5F5F64]">{[LAYER[selected.kind].short, selected.price_per_sqm == null ? null : `${Math.round(selected.price_per_sqm).toLocaleString("en-SA")} SAR/m²`, pinCandidate ? (pinCandidate.distance_km < 1 ? `${Math.round(pinCandidate.distance_km * 1000)} m` : `${pinCandidate.distance_km.toFixed(1)} km`) : null, selected.date, /^DEMO · /.test(selected.title) ? "Demo" : null].filter(Boolean).join(" · ")}</p></div>
+      <button type="button" aria-label="Close" onClick={() => update({ selectedId: null })} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/[0.05] text-[13px] text-black/60">✕</button>
+    </div>
+    {!pinCandidate ? <p className="mt-2 text-[12.5px] text-[#8A5200]">{selected.kind === "transaction" ? `Outside the ${prepared!.radius_km} km search area, so it can’t be picked.` : "Only achieved sales can be picked as comparables."}</p>
+      : !pinCandidate.eligible ? <p className="mt-2 text-[12.5px] text-[#8A5200]">Can’t be picked: {pinCandidate.exclusion_reasons.join("; ").toLowerCase()}.</p>
+      : <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <button type="button" disabled={pickBusy || (!pinPicked && pickDraft.length >= MAX_PICK)} onClick={() => setPickDraft(d => togglePick(d, selected.id))}
+          className={`h-9 rounded-full px-4 text-[14px] font-semibold transition-colors duration-150 disabled:opacity-40 ${pinPicked ? "bg-[#0071E3]/10 text-[#0062C4]" : "bg-[#0071E3] text-white"}`}>{pinPicked ? `✓ Picked as ${picked[selected.id]}` : "Pick this sale"}</button>
+        {pinPicked && <button type="button" className="text-[13.5px] text-[#C0271B]" onClick={() => setPickDraft(d => togglePick(d, selected.id))}>Remove</button>}
+        <span className="flex-1 text-right text-[12.5px] text-[#5F5F64]">{pickDraft.length} picked{pickDraft.length < MIN_PICK ? ` · ${MIN_PICK - pickDraft.length} more needed` : pickDraft.length >= MAX_PICK ? " · the most" : ""}</span>
+        {pickChanged(pickDraft, prepared) && pickDraft.length >= MIN_PICK && <button type="button" disabled={pickBusy} onClick={storePick} className="h-9 w-full rounded-[10px] bg-[#1D1D1F] text-[14px] font-semibold text-white disabled:opacity-40">{pickBusy ? "Saving…" : `Use these ${pickDraft.length} in the valuation`}</button>}
+      </div>}
+    {pickError && <p role="alert" className="mt-1 text-[12.5px] text-[#C0271B]">{pickError}</p>}
+  </div>;
+
   const analysis = <>
     <SheetHeader onBack={() => { analysisUrl(null); setPrepared(null); go("evidence"); }} backLabel="Done" title={analysisTitle.title}
       subtitle={prepared ? [analysisTitle.place, prepared.method_label].filter(Boolean).join(" · ") : "Loading…"} />
+    {pickBar}
     {(subjectType === "land" || (!!subjectType && BUILDING_TYPES.has(subjectType))) && <Section title="Area on the map" footer={areaSuggestion ? `Fills the area below: ${areaSuggestion.source.replace(MAP_SOURCE, "")}. A value you typed there is kept.` : "Measured areas fill the area below unless you typed your own."}>{areaEditor}{subjectType !== "land" && footprintRow}</Section>}
     {ws.siteOutline && <Section title="Site outline" footer="Approximate. Not a certified cadastral boundary.">
       <Row label="Approximate area" value={formatArea(geodesicAreaSqm(ws.siteOutline))} />
       <Row onClick={saveOutline} label={<span className="text-[#0071E3]">{savingOutline ? "Saving…" : "Save outline to property"}</span>} />
     </Section>}
-    <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} areaSuggestion={areaSuggestion} /></div>
+    <div className="px-3 pb-4"><ValuationWorkflow key={analysisId} propertyId={analysisId} methods={methods} onPrepared={onPrepared} onSelectEvidence={select} refreshKey={geometrySaves} areaSuggestion={areaSuggestion} pickDraft={pickDraft} onPickDraft={setPickDraft} /></div>
   </>;
 
   const filters = <>
@@ -411,7 +452,7 @@ function MapWorkspace() {
   const sheetHeight = narrow ? (sheet === "peek" ? "h-[200px]" : sheet === "half" ? "h-[52vh]" : "h-[88vh]") : "";
 
   return <div ref={root} className="mizan-apple relative h-full w-full overflow-hidden bg-[#e8e6e1]">
-    {hydrated && <MapRenderer key={imageryVersion} handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} basemap={ws.basemap} initialCamera={ws.camera}
+    {hydrated && <MapRenderer key={imageryVersion} handleRef={handle} records={located} selectedId={ws.selectedId} groupIds={group} picked={picked} basemap={ws.basemap} initialCamera={ws.camera}
       subject={ws.subject} subjectDraggable={!analysisId && !!ws.subject && !ws.subject.confirmed} searchArea={evidenceRing} editArea={editArea && !!ws.searchArea}
       siteOutline={ws.siteOutline} editOutline={editOutline} footprint={view === "flow" && fpData?.ring && !(outlineOrigin.source === "openstreetmap" && ws.siteOutline) ? fpData.ring : null} placeMarker={place} tool={tool} draft={draft ?? (measure ? { tool: "measure", points: measure } : null)}
       onCamera={onCamera} onSelect={select} onGroup={setGroup} onMapClick={onMapClick} onSubjectMove={onSubjectMove} onAreaEdit={onAreaEdit} onOutlineEdit={ring => { update({ siteOutline: ring }); setOutlineOrigin({ source: "user_drawn" }); setManualArea(null); }} onStatus={onStatus} />}

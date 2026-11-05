@@ -4,19 +4,22 @@ import { LAYER } from "@/lib/map-evidence";
 import type { Subject } from "@/lib/map-workspace-state";
 
 /** One accessible button per record or cluster. Counts are saved records, not market activity. */
-export function evidenceMarker(cluster: Cluster<MapRecord>, selectedId: string | null, groupIds: string[], showValues = false): HTMLButtonElement {
+export function evidenceMarker(cluster: Cluster<MapRecord>, selectedId: string | null, groupIds: string[], showValues = false, picked: Record<string, number> = {}): HTMLButtonElement {
   const el = document.createElement("button");
   el.type = "button";
   const single = cluster.records.length === 1 ? cluster.records[0] : null;
   const selected = cluster.records.some(r => r.id === selectedId);
   const grouped = !single && groupIds.length > 0 && cluster.records.every(r => groupIds.includes(r.id));
+  const pickNo = single ? picked[single.id] : undefined;
+  const holdsPick = !single && cluster.records.some(r => r.id in picked);
   const value = single && showValues && single.price_per_sqm != null ? new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(single.price_per_sqm) : null;
-  el.className = `mizan-marker${single ? ` mizan-marker--${single.kind}` : " mizan-marker--cluster"}${value ? " mizan-marker--value" : ""}${selected ? " is-selected" : ""}${grouped ? " is-grouped" : ""}`;
+  el.className = `mizan-marker${single ? ` mizan-marker--${single.kind}` : " mizan-marker--cluster"}${value ? " mizan-marker--value" : ""}${selected ? " is-selected" : ""}${grouped ? " is-grouped" : ""}${pickNo ? " is-picked" : ""}${holdsPick ? " holds-pick" : ""}`;
   if (single) {
     const layer = LAYER[single.kind];
     const unit = single.price_per_sqm != null ? ` · ${new Intl.NumberFormat("en-SA", { maximumFractionDigits: 0 }).format(single.price_per_sqm)} ${single.currency}/m²` : "";
-    if (value) { const key = document.createElement("span"); key.className = `mizan-key mizan-key--${single.kind}`; el.append(key, value); }
-    el.setAttribute("aria-label", `${layer.short}: ${single.title}${unit}${single.location_precision === "source_reported" ? " (location as reported by source)" : ""}`);
+    if (value) { const key = document.createElement("span"); key.className = `mizan-key mizan-key--${single.kind}`; if (pickNo) key.textContent = String(pickNo); el.append(key, value); }
+    else if (pickNo) el.textContent = String(pickNo);
+    el.setAttribute("aria-label", `${pickNo ? `Picked comparable ${pickNo}. ` : ""}${layer.short}: ${single.title}${unit}${single.location_precision === "source_reported" ? " (location as reported by source)" : ""}`);
     el.title = `${single.title} · ${layer.short}${unit}`;
   } else {
     el.textContent = String(cluster.records.length);

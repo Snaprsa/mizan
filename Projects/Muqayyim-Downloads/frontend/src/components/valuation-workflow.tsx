@@ -12,12 +12,14 @@ import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
 /** Sources written by a map measurement start with this, so a newer measurement may replace them; anything typed by a person may not. */
 export const MAP_SOURCE = "Map · ";
-export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0, areaSuggestion = null }: {
+export default function ValuationWorkflow({ propertyId, methods, onPrepared, onSelectEvidence, refreshKey = 0, areaSuggestion = null, pickDraft, onPickDraft }: {
   propertyId: string; methods: ValuationMethod[]; onPrepared: (p: PreparedAnalysis) => void; onSelectEvidence: (id: string) => void;
   /** An area measured or estimated on the map, with its source. It only fills an empty area field. */
   areaSuggestion?: { value: number; source: string; as_of: string } | null;
   /** Increment after another screen changes the property (e.g. map geometry) to adopt its new revision. */
   refreshKey?: number;
+  /** The unsaved comparable pick, owned by the map page so pins can be picked. */
+  pickDraft: string[]; onPickDraft: (ids: string[]) => void;
 }) {
   const [prepared, setPrepared] = useState<PreparedAnalysis | null>(null); const [method, setMethod] = useState("");
   const [draft, setDraft] = useState<Draft>({}); const [radius, setRadius] = useState("3"); const [lookback, setLookback] = useState("365"); const [asOf, setAsOf] = useState("");
@@ -160,7 +162,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
     {/* Everything else is one tap away. */}
     <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.05]">
       {method === "sales_comparison" ? <Disclosure title="Comparables" detail={prepared.picking ? `${prepared.eligible_comparables.length} picked` : `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable`} defaultOpen={!grid}>
-        <ComparablePicker propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} />
+        <ComparablePicker propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} chosen={pickDraft} onChosen={onPickDraft} />
         <button type="button" className="mt-2 text-[13px] text-[#0071E3] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
       </Disclosure> : <Disclosure title="Evidence used" detail={method === "sales_comparison" ? `${prepared.eligible_comparables.length} of ${prepared.candidates.length} usable` : `${prepared.candidates.length} nearby`} defaultOpen={method === "sales_comparison" && !grid}>
         <p className="text-[12.5px] text-black/50">Within {prepared.radius_km} km. Listings and draft, undated or repeated records are not used as achieved sales.</p>
