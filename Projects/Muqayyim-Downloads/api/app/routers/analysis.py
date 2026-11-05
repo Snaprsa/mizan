@@ -1,7 +1,7 @@
 """Pick location → property type → method → sourced inputs → reproducible calculation."""
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.app.database import get_db
@@ -14,7 +14,9 @@ from api.app.schemas.analysis import StartAnalysis, SaveAnalysis, RunAnalysis, S
 from api.app.services.foundation import (owner_id, can_write, owned_property, search_columns,
     save_snapshot, advance_revision, assumptions)
 from api.app.services.valuation_catalog import catalog, PROPERTY_TYPES
-from api.app.services.analysis_workflow import method_config, saudi_today, prepare, validate_input
+from api.app.services.analysis_workflow import method_config, saudi_today, prepare, validate_input, distance_km
+from api.app.services.size_effect import derive as derive_size_effect
+from api.app.routers.map import map_records
 from api.app.services.valuation_calculations import calculate
 
 router = APIRouter(prefix='/analysis', tags=['Map-first valuation'])
@@ -118,6 +120,27 @@ async def preview_adjustments(property_id: uuid.UUID, body: PreviewAdjustments,
     p = await owned_property(db, property_id, user)
     prepared = await prepare(db, p, user, method='sales_comparison', adjustments=body.adjustments.model_dump(mode='json'))
     return {'revision': p.revision, 'adjustment_analysis': prepared['adjustment_analysis'], 'gaps': prepared['gaps']}
+
+
+@router.get('/{property_id}/size-effect')
+async def size_effect(property_id: uuid.UUID, radius_km: float = Query(10, ge=0.5, le=50), lookback_days: int = Query(1095, ge=90, le=3650),
+        db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    """Measure how price per m² changes with area from saved sales and listings near the subject, and suggest
+    an area adjustment for each comparable in use. Read-only; nothing is applied until the valuer saves it."""
+    p = await owned_property(db, property_id, user)
+    evidence = await map_records(q='', city=None, district=None, property_type=None, case_id=None, date_from=None, date_to=None,
+        include_invalid=False, limit=5000, south=None, west=None, north=None, east=None, db=db, user=user)
+    prepared = await prepare(db, p, user, method='sales_comparison', evidence=evidence)
+    centre = prepared['coordinates']
+    if not centre:
+        raise HTTPException(422, 'The subject needs a location on the map')
+    nearby = [r for r in evidence['data'] if r['coordinates'] and distance_km(centre, r['coordinates']) <= radius_km]
+    area = next((f['value'] for f in prepared['fields'] if f['key'] == 'area_sqm'), None)
+    rows = (prepared['adjustment_analysis'] or {}).get('rows') or prepared['eligible_comparables']
+    result = derive_size_effect(nearby, property_type=prepared['property_type'], as_of=prepared['as_of'], lookback_days=lookback_days,
+                                subject_area=area, comparables=rows)
+    return {**result, 'radius_km': radius_km, 'lookback_days': lookback_days, 'as_of': prepared['as_of'], 'subject_area': area,
+            'property_type': prepared['property_type'], 'method': 'Ordinary least squares on saved evidence; Mizan size-effect v1'}
 
 
 @router.post('/{property_id}/runs', status_code=201)

@@ -6,7 +6,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
 import { errorText } from "@/lib/monitor";
-import { previewAdjustments, saveAdjustments, type AdjustmentAnalysis, type AdjustmentFactor, type AdjustmentRow, type AdjustmentSetup, type PreparedAnalysis } from "@/lib/api";
+import { getSizeEffect, previewAdjustments, saveAdjustments, type SizeEffect, type AdjustmentAnalysis, type AdjustmentFactor, type AdjustmentRow, type AdjustmentSetup, type PreparedAnalysis } from "@/lib/api";
 
 const EMPTY: AdjustmentSetup = { lines: [], rules: [], time: null, weighting: "equal", manual_weights: {}, weighting_rationale: null, conclusion_basis: "median", exclusions: {} };
 // The big factors valuers use for most comparables. Anything else is one tap away, never shown empty.
@@ -33,6 +33,26 @@ export default function AdjustmentSheet({ propertyId, prepared, onSaved, onClose
   const [preview, setPreview] = useState<AdjustmentAnalysis | null>(prepared.adjustment_analysis || null);
   const [checking, setChecking] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
   const [extra, setExtra] = useState<AdjustmentFactor[]>([]);
+  // Market-derived area adjustment: measured from saved evidence, applied only when the valuer chooses.
+  const [size, setSize] = useState<SizeEffect | null>(null); const [sizeOpen, setSizeOpen] = useState(false); const [sizeBusy, setSizeBusy] = useState(false);
+  const [sizeScope, setSizeScope] = useState({ radius: 10, years: 3 }); const [sizeError, setSizeError] = useState("");
+  async function measureSize(scope = sizeScope) {
+    setSizeOpen(true); setSizeBusy(true); setSizeError(""); setSizeScope(scope);
+    try { setSize(await getSizeEffect(propertyId, scope.radius, scope.years * 365)); } catch (e) { setSizeError(errorText(e)); } finally { setSizeBusy(false); }
+  }
+  function useSize() {
+    if (!size?.model) return;
+    const m = size.model; const years = Math.round(size.lookback_days / 365);
+    const why = `Market size effect: ${pctText(m.per_doubling)} per doubling of area, from ${m.n} records within ${size.radius_km} km over ${years} year${years === 1 ? "" : "s"} (R² ${m.r2 == null ? "—" : m.r2.toFixed(2)})`;
+    setNotice("");
+    setSetup(s => {
+      const keep = s.lines.filter(l => !(l.factor === "size" && l.basis === "percent" && size.suggestions.some(x => x.comparable_id === l.comparable_id && x.percent != null)));
+      const added = size.suggestions.filter(x => x.percent != null).map(x => ({ comparable_id: x.comparable_id, factor: "size" as AdjustmentFactor, basis: "percent" as const,
+        amount: Math.round(x.percent! * 1000) / 1000, rationale: why, source: `Mizan size analysis, ${size.as_of}`, status: "approved" as const }));
+      return { ...s, lines: [...keep, ...added] };
+    });
+    setSizeOpen(false);
+  }
   const dirty = JSON.stringify(setup) !== JSON.stringify(saved);
 
   // Recalculate on the server shortly after each edit; nothing is stored until Save.
@@ -101,7 +121,7 @@ export default function AdjustmentSheet({ propertyId, prepared, onSaved, onClose
   const rate = a?.concluded_sar_sqm ?? null; const exact = a?.concluded_unrounded_sar_sqm ?? rate;
   const basisLabel: Record<string, string> = { median: "median", mean: "average", weighted_mean: "weighted average", weighted_median: "weighted median" };
   const factorRow = (f: { key: AdjustmentFactor; label: string }) => <tr key={f.key}>
-    <th scope="row" className="sheet-label">{f.label}</th>
+    <th scope="row" className="sheet-label">{f.label}{f.key === "size" && <button type="button" onClick={() => measureSize()} className="ml-2 rounded-full bg-[#0071E3]/10 px-2 py-0.5 text-[11.5px] font-semibold text-[#0062C4] hover:bg-[#0071E3]/15">Suggest from market</button>}</th>
     {rows.map(r => { const own = lineOf(f.key, r.id); const got = applied(f.key, r);
       return <td key={r.id} className="sheet-cell"><span className="relative inline-flex items-center">
         <input aria-label={`${f.label}, comparable ${rows.indexOf(r) + 1}, percent`} inputMode="decimal" className="sheet-input" placeholder={own || got == null ? "0" : (got * 100).toFixed(1).replace(/\.0$/, "")}
@@ -122,6 +142,7 @@ export default function AdjustmentSheet({ propertyId, prepared, onSaved, onClose
         <button type="button" aria-label="Close" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-black/[0.05] text-[#1D1D1F] hover:bg-black/[0.08]"><X size={17} /></button>
       </div>
 
+      {sizeOpen && <SizePanel result={size} busy={sizeBusy} error={sizeError} scope={sizeScope} rows={rows} onScope={measureSize} onUse={useSize} onClose={() => setSizeOpen(false)} />}
       <div className="overflow-auto">{rows.length === 0 ? <p className="p-8 text-center text-[14px] text-[#5F5F64]">Pick at least 3 comparables first.</p> :
         <table className="mizan-sheet w-full border-separate border-spacing-0 text-[13.5px]" style={{ minWidth: 220 + rows.length * 128 }}>
           <thead className="sticky top-0 z-10"><tr><th className="sheet-head sheet-label">Item</th>{rows.map((r, i) => <th key={r.id} className="sheet-head" title={r.title || ""}>
@@ -176,6 +197,39 @@ export default function AdjustmentSheet({ propertyId, prepared, onSaved, onClose
       </div>
     </div>
   </div>, document.body);
+}
+
+// What the evidence says about plot size, in words first, numbers second; nothing is applied until "Use".
+function SizePanel({ result, busy, error, scope, rows, onScope, onUse, onClose }: { result: SizeEffect | null; busy: boolean; error: string; scope: { radius: number; years: number };
+  rows: AdjustmentRow[]; onScope: (s: { radius: number; years: number }) => void; onUse: () => void; onClose: () => void }) {
+  const m = result?.model; const per = m ? Math.abs(m.per_doubling * 100) : 0;
+  return <div className="mizan-rise-in border-b border-black/[0.06] bg-[#F5F9FF] px-5 py-4">
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-[#0062C4]">Area adjustment from the market</p>
+        {busy ? <p className="mt-1 text-[14px] text-[#5F5F64]">Measuring how price per m² changes with area…</p>
+          : error ? <p role="alert" className="mt-1 text-[14px] text-[#C0271B]">{error}</p>
+          : m ? <>
+            <p className="mt-1 text-[16px] font-semibold text-[#1D1D1F]">Price per m² {m.per_doubling < 0 ? "falls" : "rises"} about {per.toFixed(1)}% each time the area doubles</p>
+            <p className="mt-0.5 text-[12.5px] leading-snug text-[#5F5F64]">From {result!.sales} sales{result!.listings ? ` and ${result!.listings} asking prices` : ""} within {result!.radius_km} km over {scope.years} year{scope.years === 1 ? "" : "s"}
+              {result!.area_range ? ` (${n0.format(result!.area_range[0])}–${n0.format(result!.area_range[1])} m²)` : ""}. 95% range {pctText(m.per_doubling_low)} to {pctText(m.per_doubling_high)} per doubling · fit R² {m.r2 == null ? "—" : m.r2.toFixed(2)}
+              {result!.outliers_removed ? ` · ${result!.outliers_removed} extreme ${result!.outliers_removed === 1 ? "price" : "prices"} left out` : ""}{m.asking_premium != null ? ` · asking prices ${pctText(m.asking_premium)} vs sales` : ""}.</p></>
+          : result ? <p className="mt-1 text-[14px] text-[#1D1D1F]">Not enough evidence to measure a size effect.</p> : null}
+        {!!result?.notes.length && !busy && <ul className="mt-2 space-y-0.5 text-[12.5px] text-[#8A5200]">{result.notes.map(n => <li key={n}>{n}</li>)}</ul>}
+        {m && !busy && <div className="mt-3 flex flex-wrap gap-2">{rows.map((r, i) => { const s = result!.suggestions.find(x => x.comparable_id === r.id);
+          return <span key={r.id} className="rounded-lg bg-white px-2.5 py-1.5 text-[12.5px] ring-1 ring-black/[0.06]"><span className="text-[#5F5F64]">Comparable {i + 1} · {num(r.area_sqm)} m² → </span>
+            <span className="font-semibold tabular-nums text-[#1D1D1F]">{s?.percent == null ? "—" : pctText(s.percent)}</span></span>; })}</div>}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[12.5px] text-[#5F5F64]">
+          <label className="flex items-center gap-1.5">Within<select className="mizan-compact-input !h-8 !w-24 !text-[13px]" value={scope.radius} disabled={busy} onChange={e => onScope({ ...scope, radius: Number(e.target.value) })}>{[3, 5, 10, 20, 30].map(v => <option key={v} value={v}>{v} km</option>)}</select></label>
+          <label className="flex items-center gap-1.5">over<select className="mizan-compact-input !h-8 !w-28 !text-[13px]" value={scope.years} disabled={busy} onChange={e => onScope({ ...scope, years: Number(e.target.value) })}>{[1, 2, 3, 5].map(v => <option key={v} value={v}>{v} year{v === 1 ? "" : "s"}</option>)}</select></label>
+          <span className="flex-1" />
+          <button type="button" className="h-9 px-3 text-[14px] text-[#5F5F64]" onClick={onClose}>Close</button>
+          <button type="button" disabled={busy || !m || !result?.suggestions.some(x => x.percent != null)} onClick={onUse} className="h-9 rounded-[10px] bg-[#0071E3] px-4 text-[14px] font-semibold text-white disabled:opacity-40">Use for the Area row</button>
+        </div>
+        {m && !busy && <p className="mt-2 text-[11.5px] text-[#5F5F64]">Adjustment = (subject area ÷ comparable area)<sup>b</sup> − 1, with b = {m.elasticity.toFixed(3)} from {m.formula}. Time and location are not separated out; you can still edit each cell.</p>}
+      </div>
+    </div>
+  </div>;
 }
 
 function AddFactor({ options, onAdd }: { options: { key: AdjustmentFactor; label: string }[]; onAdd: (k: AdjustmentFactor) => void }) {

@@ -212,3 +212,10 @@ Running `next dev` against the default `.next` overwrote the production build se
 - UI: Properties page has a trash button with inline confirm, an Undo bar, and a "Deleted" list with Restore. The map's property sheet has "Delete property" with confirmation.
 - Runtime DB: backed up with `sqlite3 .backup` to `storage/backups/mizan-before-property-delete-<stamp>.db` (ignored by Git), rehearsed on a copy (11 properties kept, integrity ok), then upgraded to head.
 - Checks: 142 backend, 24 frontend, lint, build; browser check on a fresh disposable DB (delete, undo, delete from map).
+
+## 2026-11-05 · Market-derived area (size) adjustment
+- `api/app/services/size_effect.py`: OLS on saved evidence, ln(price/m²) = a + b·ln(area) [+ c·asking indicator when both sales and listings exist]. Same property type, active, SAR, priced, dated within the lookback, within the chosen radius of the subject. Extreme unit prices (1.5×IQR of ln price) are left out. Requires ≥8 records and a ≥2× area spread, else no suggestion. Reports n, sales/listings, area range, R², 95% t-range of b, per-doubling effect, asking premium, and notes (no clear effect when the range spans zero; extrapolation; listings only). Adjustment = (subject area ÷ comparable area)^b − 1.
+- `GET /api/v1/analysis/{id}/size-effect?radius_km=10&lookback_days=1095` (read-only).
+- Adjustment table: "Suggest from market" on the Area row opens a panel (plain-language result, per-comparable %, radius/period selectors, formula). "Use for the Area row" fills editable cells with a rationale and source naming the evidence; nothing is saved until Save.
+- Tests: `api/tests/test_size_effect.py` (known synthetic effect recovered, thin/narrow/old/other-type evidence refused, no-clear-effect reported, endpoint saves nothing). 146 backend, 24 frontend, lint, build. Browser check on a disposable DB with 30 synthetic DEMO land records (true b −0.14, recovered −0.153).
+- Live data note: the owner's current demo land comparables show no clear size effect (R² 0.06; range spans zero) because they were generated without one; the panel says so.
