@@ -34,8 +34,10 @@ type Props = { propertyId: string; prepared: PreparedAnalysis; disabled: boolean
   chosen: string[]; onChosen: (ids: string[]) => void };
 
 export default function ComparablePicker({ propertyId, prepared, disabled, onSaved, onSelectEvidence, onEvidenceChanged, chosen, onChosen }: Props) {
-  const usable = useMemo(() => prepared.candidates.filter(c => c.eligible).sort((a, b) => a.distance_km - b.distance_km), [prepared.candidates]);
-  const unusable = prepared.candidates.filter(c => !c.eligible);
+  // Achieved sales, plus asking-price listings that can be used only when picked.
+  const usable = useMemo(() => prepared.candidates.filter(c => c.eligible || c.pickable).sort((a, b) => a.distance_km - b.distance_km), [prepared.candidates]);
+  const sales = usable.filter(c => c.eligible);
+  const unusable = prepared.candidates.filter(c => !c.eligible && !c.pickable);
   const saved = prepared.adjustment_setup?.selected ?? null;
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [table, setTable] = useState(false);
   const changed = pickChanged(chosen, prepared);
@@ -50,12 +52,12 @@ export default function ComparablePicker({ propertyId, prepared, disabled, onSav
   const toggle = (id: string) => onChosen(togglePick(chosen, id));
 
   // The table shows the sales the valuation uses now: the saved pick, or every usable sale before picking.
-  const used = saved ? usable.filter(c => saved.includes(c.id)) : usable;
+  const used = saved ? usable.filter(c => saved.includes(c.id)) : sales;
   const rows = prepared.adjustment_analysis ? new Map([...prepared.adjustment_analysis.rows, ...prepared.adjustment_analysis.excluded].map(r => [r.id, r])) : new Map<string, AdjustmentRow>();
 
   return <div className="space-y-3">
     <p className="text-[12.5px] leading-snug text-black/55">
-      {saved ? `This valuation uses the ${saved.length} sales you picked. Tap a sale on the map to add or remove it.` : usable.length ? `All ${usable.length} usable sales within ${prepared.radius_km} km are used. Pick ${MIN_PICK} to ${MAX_PICK} here or by tapping sales on the map.` : `No usable sales within ${prepared.radius_km} km.`}
+      {saved ? `This valuation uses the ${saved.length} comparables you picked. Tap one on the map to add or remove it.` : sales.length ? `All ${sales.length} usable sales within ${prepared.radius_km} km are used. Pick ${MIN_PICK} to ${MAX_PICK} here or on the map; asking prices can be picked too.` : `No usable sales within ${prepared.radius_km} km.`}
     </p>
     {usable.length > 0 && <button type="button" onClick={() => setTable(true)} className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-[#0062C4]"><Table2 size={15} />See all details of {saved ? "the picked" : "these"} sales</button>}
 
@@ -66,7 +68,7 @@ export default function ComparablePicker({ propertyId, prepared, disabled, onSav
           className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ring-1 transition-colors duration-150 ${on ? "bg-[#0071E3] text-white ring-[#0071E3]" : "bg-white ring-black/20"} disabled:opacity-35`}>{on && <Check size={14} strokeWidth={3} />}</button>
         <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onSelectEvidence(c.id)}>
           <span className="line-clamp-2 text-[14px] font-medium leading-snug text-[#1D1D1F]" dir="auto">{name(c)}</span>
-          <span className="block text-[12px] text-[#5F5F64]">{[km(c.distance_km), monthYear(c.date), c.district, c.area_sqm == null ? null : `${n0.format(c.area_sqm)} m²`, isDemo(c) ? "Demo" : null].filter(Boolean).join(" · ")}</span>
+          <span className="block text-[12px] text-[#5F5F64]">{[km(c.distance_km), monthYear(c.date), c.district, c.area_sqm == null ? null : `${n0.format(c.area_sqm)} m²`, c.eligible ? null : "Asking price", isDemo(c) ? "Demo" : null].filter(Boolean).join(" · ")}</span>
         </button>
         <span className="text-right text-[14px] font-semibold tabular-nums text-[#1D1D1F]">{num(c.price_per_sqm)}<span className="block text-[11px] font-normal text-[#5F5F64]">SAR/m²</span></span>
       </li>; })}</ul>

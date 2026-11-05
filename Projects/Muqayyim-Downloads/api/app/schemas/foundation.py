@@ -194,6 +194,8 @@ class AdjustmentSetup(StrictModel):
     exclusions: dict[str, str] = Field(default_factory=dict)
     # The sales the valuer picked (3 to 6). None means every eligible sale, as before picking existed.
     selected: list[str] | None = Field(None, max_length=MAX_PICKED)
+    # Round the concluded SAR/m² to this step (e.g. 100), as valuers do; None keeps it exact.
+    round_to: Literal[1, 5, 10, 25, 50, 100, 250, 500, 1000] | None = None
 
     @model_validator(mode='after')
     def consistent(self):

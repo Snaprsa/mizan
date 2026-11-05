@@ -64,8 +64,10 @@ def subject_attributes(p):
             'grade_basis': building.get('grade_basis'), 'street_width_m': land.get('street_width_m'), 'corner': land.get('corner')}
 
 
-async def prepare(db, p, user, method=None, as_of=None, evidence=None):
+async def prepare(db, p, user, method=None, as_of=None, evidence=None, adjustments=None):
     setup = p.data.get('analysis') or {}
+    if adjustments is not None:  # an unsaved grid, previewed without touching the property
+        setup = {**setup, 'adjustments': adjustments}
     key = method or setup.get('method') or 'sales_comparison'
     config = method_config(key)
     as_of = as_of or setup.get('as_of') or saudi_today().isoformat()
@@ -126,7 +128,7 @@ async def prepare(db, p, user, method=None, as_of=None, evidence=None):
         south=None, west=None, north=None, east=None, db=db, user=user)
     location = p.data.get('location', {})
     coords = [location.get('latitude'), location.get('longitude')]
-    candidates, eligible, seen = [], [], set()
+    candidates, eligible, listings, seen = [], [], [], set()
     for record in evidence['data']:
         if record['kind'] in {'property', 'market'}: continue
         if not record['coordinates'] or None in coords: continue
@@ -143,9 +145,12 @@ async def prepare(db, p, user, method=None, as_of=None, evidence=None):
         if not reasons:
             if fingerprint in seen: reasons.append('Repeated source / transaction evidence')
             else: seen.add(fingerprint)
-        candidate = {**record, 'distance_km': round(distance, 3), 'eligible': not reasons, 'exclusion_reasons': reasons}
+        # An asking-price listing is never used automatically, but the valuer may pick it and discount it.
+        pickable = not reasons or (record['kind'] == 'listing' and reasons == ['Not an achieved transaction'])
+        candidate = {**record, 'distance_km': round(distance, 3), 'eligible': not reasons, 'pickable': pickable, 'exclusion_reasons': reasons}
         candidates.append(candidate)
         if not reasons: eligible.append(candidate)
+        elif pickable: listings.append(candidate)
     candidates.sort(key=lambda r: r['distance_km'])
     gaps = [f"{f['label']}: {f['error']}" for f in fields if f['error']]
     values = {f['key']: f['value'] for f in fields if f['value'] is not None}
@@ -154,8 +159,9 @@ async def prepare(db, p, user, method=None, as_of=None, evidence=None):
     if picked is not None:
         # Only the sales the valuer picked are analysed; the rest stay visible as candidates.
         for c in candidates: c['picked'] = c['id'] in picked
-        lost = [i for i in picked if i not in {c['id'] for c in eligible}]
-        eligible = [c for c in eligible if c['id'] in picked]
+        usable = eligible + listings
+        lost = [i for i in picked if i not in {c['id'] for c in usable}]
+        eligible = [c for c in usable if c['id'] in picked]
         if lost:
             gaps.append(f"{len(lost)} picked {'sale is' if len(lost) == 1 else 'sales are'} no longer usable; pick another")
     eligible.sort(key=lambda r: r['distance_km'])

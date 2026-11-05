@@ -218,7 +218,7 @@ export const getMapRecords = (filters: Record<string, string>, init?: { signal?:
 export type ValuationField = { key: string; label: string; unit: string; minimum: number; maximum: number | null; positive: boolean;
   value: number | null; source: string | null; as_of: string | null; origin: string | null; assumption_status?: string; state: string; error: string | null };
 export type ValuationMethod = { key: string; label: string; implemented: boolean; description: string; fields: ValuationField[] };
-export type Candidate = MapRecord & { distance_km: number; eligible: boolean; exclusion_reasons: string[]; picked?: boolean };
+export type Candidate = MapRecord & { distance_km: number; eligible: boolean; exclusion_reasons: string[]; picked?: boolean; pickable?: boolean };
 export type AdjustmentFactor = "conditions_of_sale" | "financing" | "market_conditions" | "location" | "size" | "frontage" | "street_width" | "corner" | "shape" | "condition" | "age" | "quality" | "occupancy" | "development_potential" | "zoning" | "floor" | "position" | "grade" | "other";
 export type RuleFactor = "size" | "floor" | "position" | "grade" | "street_width" | "corner";
 export type AdjustmentRule = { factor: RuleFactor; percent: number; source: string; status: "proposed" | "approved" };
@@ -229,7 +229,7 @@ export type SubjectAttributes = ComparableAttributes & { grade_basis?: "assumed"
 export type AdjustmentLine = { comparable_id: string; factor: AdjustmentFactor; basis: "percent" | "sar_per_sqm" | "sar_total"; amount: number; rationale: string; source?: string | null; status: "proposed" | "approved" };
 export type AdjustmentSetup = { lines: AdjustmentLine[]; rules: AdjustmentRule[]; time: { annual_rate: number; source: string; as_of: string; status: "proposed" | "approved" } | null;
   weighting: "equal" | "inverse_gross_adjustment" | "manual"; manual_weights: Record<string, number>; weighting_rationale: string | null;
-  conclusion_basis: "median" | "mean" | "weighted_mean" | "weighted_median"; exclusions: Record<string, string>; selected?: string[] | null };
+  conclusion_basis: "median" | "mean" | "weighted_mean" | "weighted_median"; exclusions: Record<string, string>; selected?: string[] | null; round_to?: number | null };
 export type AdjustmentStep = AdjustmentLine & { stage: "transactional" | "property"; base_sar_sqm: number; delta_sar_sqm: number; derived?: boolean };
 export type AdjustmentRow = { attributes: ComparableAttributes; id: string; title: string | null; date: string | null; area_sqm: number | null; distance_km: number | null;
   raw_sar_sqm: number; transaction_adjusted_sar_sqm: number; adjusted_sar_sqm: number; gross_adjustment: number | null; net_adjustment: number | null;
@@ -237,7 +237,7 @@ export type AdjustmentRow = { attributes: ComparableAttributes; id: string; titl
   details?: { city: string | null; district: string | null; property_type: string | null; kind: string; evidence_type: string | null; price: number | null; currency: string; source: string; date_basis: string; coordinates: [number, number] | null } };
 export type GridStatistics = { n: number; mean: number; median: number; min: number; max: number; p25: number; p75: number; std: number; cv: number | null; weighted_mean?: number; weighted_median?: number };
 export type AdjustmentAnalysis = { demo_count: number; rows: AdjustmentRow[]; excluded: AdjustmentRow[]; orphaned_lines: AdjustmentLine[]; pending_count: number;
-  raw: GridStatistics | null; adjusted: GridStatistics | null; weighting: string; conclusion_basis: string; concluded_sar_sqm: number | null;
+  raw: GridStatistics | null; adjusted: GridStatistics | null; weighting: string; conclusion_basis: string; concluded_sar_sqm: number | null; concluded_unrounded_sar_sqm?: number | null; round_to?: number | null; listing_count?: number;
   indication: { low: number; base: number; high: number; basis: string } | null; gaps: string[]; conventions: string[] };
 export type PreparedAnalysis = { picking?: boolean; subject_attributes?: SubjectAttributes; comparison_factors?: RuleFactor[]; adjustment_setup?: AdjustmentSetup | null; adjustment_analysis?: AdjustmentAnalysis | null;
   property_id: string; property_name: string; revision: number; property_type: string; calculation_version: string;
@@ -252,6 +252,7 @@ export const startMapAnalysis = (body: { latitude: number; longitude: number; pr
 export const prepareAnalysis = (id: string, method?: string) => request<PreparedAnalysis>(`/api/v1/analysis/${id}${method ? `?method=${encodeURIComponent(method)}` : ""}`);
 export const saveAnalysisInputs = (id: string, body: { expected_revision: number; method: string; inputs: Record<string, AnalysisInput>; as_of: string; radius_km: number; lookback_days: number }) => request<PreparedAnalysis>(`/api/v1/analysis/${id}/inputs`, { method: "PUT", body: JSON.stringify(body) });
 export const saveAdjustments = (id: string, body: { expected_revision: number; reason: string; adjustments: AdjustmentSetup }) => request<PreparedAnalysis>(`/api/v1/analysis/${id}/adjustments`, { method: "PUT", body: JSON.stringify(body) });
+export const previewAdjustments = (id: string, adjustments: AdjustmentSetup, init?: { signal?: AbortSignal }) => request<{ revision: number; adjustment_analysis: AdjustmentAnalysis | null; gaps: string[] }>(`/api/v1/analysis/${id}/adjustments/preview`, { method: "POST", body: JSON.stringify({ adjustments }), ...init });
 export const saveComparableAttributes = (entityId: string, attributes: ComparableAttributes, reason: string) => request<{ id: string; attributes: ComparableAttributes }>(`/api/v1/evidence/${entityId}/attributes`, { method: "PUT", body: JSON.stringify({ attributes, reason }) });
 export const importDemoComparables = (records: unknown[]) => request<{ inserted: number; duplicates: number; rejected_count: number; rejected: { index: number; title: string; reason: string }[] }>("/api/v1/evidence/demo", { method: "POST", body: JSON.stringify({ records }) });
 export const removeDemoComparables = () => request<{ removed: number }>("/api/v1/evidence/demo", { method: "DELETE" });

@@ -43,3 +43,7 @@ class SaveAdjustments(StrictModel):
     expected_revision: int = Field(ge=1)
     reason: str = Field(min_length=3, max_length=500)
     adjustments: AdjustmentSetup
+
+
+class PreviewAdjustments(StrictModel):
+    adjustments: AdjustmentSetup

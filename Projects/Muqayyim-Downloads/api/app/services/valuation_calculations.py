@@ -19,7 +19,7 @@ def calculate(method, v, eligible, *, include_sensitivity=True, adjustments=None
         rates = [r['raw_sar_sqm'] for r in grid['rows']]
         applied = sum(len(r['steps']) for r in grid['rows'])
         result.update(value=rate*v['area_sqm'], price_per_sqm=rate,
-            evidence={'concluded_sar_sqm': rate, 'conclusion_basis': grid['conclusion_basis'], 'weighting': grid['weighting'],
+            evidence={'concluded_sar_sqm': rate, 'concluded_unrounded_sar_sqm': grid['concluded_unrounded_sar_sqm'], 'round_to': grid['round_to'], 'conclusion_basis': grid['conclusion_basis'], 'weighting': grid['weighting'],
                       'comparable_count': len(grid['rows']), 'excluded_count': len(grid['excluded']), 'area_sqm': v['area_sqm'],
                       'observed_unit_price_min': min(rates), 'observed_unit_price_max': max(rates),
                       'raw_statistics': grid['raw'], 'adjusted_statistics': grid['adjusted'], 'indication': grid['indication'],
@@ -30,7 +30,9 @@ def calculate(method, v, eligible, *, include_sensitivity=True, adjustments=None
                          if not applied else ['Adjustments are reviewer judgements recorded with rationales; they are not market-derived unless their source says so.'])
                         + ['The interquartile range of adjusted unit values is not a confidence interval.']
                         + ([f"{grid['pending_count']} proposed adjustment(s) were not approved and were not applied."] if grid['pending_count'] else [])
-                        + ([f"Uses {grid['demo_count']} synthetic demo comparable(s). This is not a real market indication."] if grid['demo_count'] else []))
+                        + ([f"Uses {grid['demo_count']} synthetic demo comparable(s). This is not a real market indication."] if grid['demo_count'] else [])
+                        + ([f"{grid['listing_count']} comparable(s) are asking prices, not achieved sales; their negotiation discount is the reviewer's judgement."] if grid['listing_count'] else [])
+                        + ([f"Concluded rate rounded to the nearest {grid['round_to']:,} SAR/m² (unrounded {grid['concluded_unrounded_sar_sqm']:,.0f})."] if grid['round_to'] else []))
     elif method == 'income_capitalization':
         effective = v['annual_rent']*(1-v['vacancy'])+v['other_income']
         noi = effective-v['operating_expenses']

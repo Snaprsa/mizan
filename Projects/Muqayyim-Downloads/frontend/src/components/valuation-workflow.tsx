@@ -7,6 +7,7 @@ import { ComparableAttributes, PreparedAnalysis, RuleFactor, SubjectAttributes, 
 import SensitivityTable from "./sensitivity-table";
 import AdjustmentGrid, { AttributeInput } from "./adjustment-grid";
 import ComparablePicker from "./comparable-picker";
+import AdjustmentSheet from "./adjustment-sheet";
 import { preparedSignature, savedRunMatchesPrepared, valuationSignature } from "@/lib/valuation-state";
 
 type Draft = Record<string, { value: string; source: string; as_of: string }>;
@@ -24,7 +25,7 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
   const [prepared, setPrepared] = useState<PreparedAnalysis | null>(null); const [method, setMethod] = useState("");
   const [draft, setDraft] = useState<Draft>({}); const [radius, setRadius] = useState("3"); const [lookback, setLookback] = useState("365"); const [asOf, setAsOf] = useState("");
   const [automatic, setAutomatic] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const [notice, setNotice] = useState(""); const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [notice, setNotice] = useState(""); const [result, setResult] = useState<AnalysisResult | null>(null); const [sheetOpen, setSheetOpen] = useState(false);
   const [runs, setRuns] = useState<{ id: string; created_at: string; data: AnalysisResult }[]>([]);
   const processed = useRef(""); const alive = useRef(true);
   const hydrate = useCallback((p: PreparedAnalysis) => {
@@ -169,8 +170,17 @@ export default function ValuationWorkflow({ propertyId, methods, onPrepared, onS
         <div className="mt-2 max-h-56 divide-y divide-black/[0.05] overflow-auto">{prepared.candidates.slice(0, 30).map(c => <button key={c.id} type="button" className="block w-full py-1.5 text-left" onClick={() => onSelectEvidence(c.id)}><span className="block truncate text-[14px] text-black/80" dir="auto">{c.title}</span><span className={`block text-[12px] ${c.eligible ? "text-[#248a3d]" : "text-black/45"}`}>{c.distance_km} km · {c.eligible ? "Used" : c.exclusion_reasons.join("; ")}</span></button>)}{!prepared.candidates.length && <p className="py-2 text-[13px] text-black/45">No located evidence within this radius.</p>}</div>
         <button type="button" className="mt-2 text-[13px] text-[#0071E3] disabled:opacity-40" disabled={busy} onClick={refresh}>Refresh evidence</button>
       </Disclosure>}
-      {method === "sales_comparison" && grid && <Disclosure title="Adjust comparables" detail={applied ? `${applied} applied` : `${grid.rows.length} sales`}>
-        <AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} /></Disclosure>}
+      {method === "sales_comparison" && grid && <Disclosure title="Adjust comparables" detail={applied ? `${applied} applied` : `${grid.rows.length} comparables`} defaultOpen>
+        <div className="rounded-xl bg-[#F5F5F7] px-4 py-3">
+          <p className="text-[12.5px] text-[#5F5F64]">Rate for this property{grid.round_to ? `, rounded to ${grid.round_to.toLocaleString("en-SA")}` : ""}</p>
+          <p className="text-[22px] font-semibold tabular-nums tracking-tight text-[#1D1D1F]">{grid.concluded_sar_sqm == null ? "—" : `${Math.round(grid.concluded_sar_sqm).toLocaleString("en-SA")} SAR/m²`}</p>
+          <p className="text-[12px] text-[#5F5F64]">{grid.rows.length} comparables · {applied ? `${applied} adjustments` : "no adjustments yet"}{grid.listing_count ? ` · ${grid.listing_count} asking ${grid.listing_count === 1 ? "price" : "prices"}` : ""}</p>
+        </div>
+        <button type="button" onClick={() => setSheetOpen(true)} className="mt-3 h-11 w-full rounded-[12px] bg-[#0071E3] text-[15px] font-semibold text-white active:opacity-80">Open adjustment table</button>
+        <details className="mt-3"><summary className="cursor-pointer text-[13px] text-[#5F5F64]">More options: rates from details, time, excluding a sale</summary>
+          <div className="mt-3"><AdjustmentGrid propertyId={propertyId} prepared={prepared} disabled={busy} onSaved={adopt} onSelectEvidence={onSelectEvidence} onEvidenceChanged={refresh} /></div></details>
+        {sheetOpen && <AdjustmentSheet propertyId={propertyId} prepared={prepared} onSaved={adopt} onClose={() => setSheetOpen(false)} subjectArea={prepared.fields.find(f => f.key === "area_sqm")?.value ?? null} />}
+      </Disclosure>}
       {result && <Disclosure title="How this was calculated">
         <ul className="list-disc space-y-1 pl-4 text-[12.5px] text-black/55">{result.outputs.limitations.map(l => <li key={l}>{l}</li>)}</ul>
         <SensitivityTable sensitivity={result.outputs.sensitivity} />

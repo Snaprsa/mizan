@@ -10,7 +10,7 @@ from api.app.audit import log_action
 from api.app.models import Case, ValuationRun
 from api.app.models.foundation import Property, PropertyAssumption
 from api.app.schemas.foundation import PropertyInput
-from api.app.schemas.analysis import StartAnalysis, SaveAnalysis, RunAnalysis, SaveAdjustments
+from api.app.schemas.analysis import StartAnalysis, SaveAnalysis, RunAnalysis, SaveAdjustments, PreviewAdjustments
 from api.app.services.foundation import (owner_id, can_write, owned_property, search_columns,
     save_snapshot, advance_revision, assumptions)
 from api.app.services.valuation_catalog import catalog, PROPERTY_TYPES
@@ -109,6 +109,15 @@ async def save_adjustments(property_id: uuid.UUID, body: SaveAdjustments,
     await log_action(db, 'property', p.id, 'comparable_adjustments_saved', user['id'],
                      {'revision': p.revision, 'lines': len(setup['lines']), 'excluded': len(setup['exclusions']), 'picked': None if setup['selected'] is None else len(setup['selected'])})
     return await prepare(db, p, user)
+
+
+@router.post('/{property_id}/adjustments/preview')
+async def preview_adjustments(property_id: uuid.UUID, body: PreviewAdjustments,
+        db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
+    """Calculate an unsaved adjustment grid. Nothing is stored; saving still needs the revision check."""
+    p = await owned_property(db, property_id, user)
+    prepared = await prepare(db, p, user, method='sales_comparison', adjustments=body.adjustments.model_dump(mode='json'))
+    return {'revision': p.revision, 'adjustment_analysis': prepared['adjustment_analysis'], 'gaps': prepared['gaps']}
 
 
 @router.post('/{property_id}/runs', status_code=201)

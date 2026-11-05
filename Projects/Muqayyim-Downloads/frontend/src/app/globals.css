@@ -103,3 +103,19 @@ select.mizan-compact-input { appearance:none; -webkit-appearance:none; padding-r
 .mizan-marker--value.is-picked { width:auto; height:26px; box-shadow:0 0 0 2.5px #0071E3, 0 2px 8px rgb(0 0 0 / .35); }
 .mizan-marker--value.is-picked .mizan-key { display:grid; place-items:center; width:16px; height:16px; border:0; background:#0071E3; color:#fff; font-size:10px; font-weight:700; }
 .mizan-marker--cluster.holds-pick { box-shadow:0 0 0 3px #0071E3, 0 2px 6px rgb(0 0 0 / .35); }
+
+/* Adjustment table: a calm valuation sheet. Labels stick on the left while comparables scroll. */
+.mizan-sheet th, .mizan-sheet td { border-bottom:1px solid rgb(0 0 0 / .05); }
+.mizan-sheet .sheet-head { background:#F5F5F7; padding:10px 8px; text-align:center; font-size:12.5px; font-weight:600; color:#1D1D1F; border-bottom:1px solid rgb(0 0 0 / .08); }
+.mizan-sheet .sheet-label { position:sticky; left:0; z-index:1; background:#fff; padding:7px 14px; text-align:left; font-weight:500; color:#1D1D1F; white-space:nowrap; }
+.mizan-sheet thead .sheet-label { z-index:3; background:#F5F5F7; }
+.mizan-sheet .sheet-cell { padding:6px 8px; text-align:center; color:#1D1D1F; }
+.mizan-sheet .sheet-total td, .mizan-sheet .sheet-total .sheet-label { color:#5F5F64; }
+.mizan-sheet .sheet-strong td, .mizan-sheet .sheet-strong .sheet-label { background:#EEF5FD; font-weight:600; }
+.mizan-sheet .sheet-band { padding:12px 14px 6px; text-align:left; font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#5F5F64; background:#fff; position:sticky; left:0; }
+.mizan-sheet .sheet-input { width:84px; height:32px; padding:0 22px 0 8px; border-radius:8px; background:#F5F5F7; border:1px solid transparent; text-align:right; font-variant-numeric:tabular-nums; font-size:13.5px; color:#1D1D1F; transition:border-color 150ms ease, background-color 150ms ease; }
+.mizan-sheet .sheet-input:hover { background:#EDEDF0; }
+.mizan-sheet .sheet-input:focus { outline:none; background:#fff; border-color:#0071E3; box-shadow:0 0 0 3px rgb(0 113 227 / .15); }
+.mizan-sheet .sheet-input::placeholder { color:#8E8E93; }
+@media (prefers-reduced-motion: reduce) { .mizan-sheet .sheet-input { transition:none; } }
+@media (max-width: 640px) { .mizan-sheet .sheet-label { white-space:normal; width:132px; min-width:132px; max-width:132px; padding:7px 10px; font-size:12.5px; line-height:1.25; box-shadow:1px 0 0 rgb(0 0 0 / .06); } .mizan-sheet .sheet-input { width:72px; } }

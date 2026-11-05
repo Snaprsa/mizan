@@ -225,3 +225,66 @@ async def test_valuer_picks_three_to_six_sales_and_only_those_are_used(client):
     assert row['attributes']['use'] == 'commercial' and row['attributes']['frontages'] == 2
     run = (await client.post(path + '/runs', json={'expected_revision': with_far['revision']})).json()
     assert {c['id'] for c in run['comparables']} == {far, *[i for i in ids if i != far][:2]}
+
+
+def test_reproduces_a_valuers_sheet_with_listings_weights_and_rounding():
+    # The owner's sheet: two sales, two asking prices, one more sale; comparable 2 weighted 0%.
+    sheet = comps(3636, 2614, 5871, 5441, 4299)
+    for c in sheet[2:4]: c['kind'] = 'listing'
+    lines = [line('c0', 'location', 'percent', -0.10), line('c1', 'location', 'percent', -0.10),
+             line('c2', 'conditions_of_sale', 'percent', -0.15), line('c2', 'size', 'percent', -0.05), line('c2', 'location', 'percent', -0.10),
+             line('c3', 'conditions_of_sale', 'percent', -0.15), line('c3', 'size', 'percent', -0.15), line('c3', 'location', 'percent', -0.05),
+             line('c4', 'location', 'percent', -0.05)]
+    setup = {'lines': lines, 'weighting': 'manual', 'manual_weights': {'c0': 25, 'c1': 0, 'c2': 25, 'c3': 25, 'c4': 25},
+             'weighting_rationale': 'Comparable 2 is in a weaker district', 'conclusion_basis': 'weighted_mean', 'round_to': 100}
+    g = analyse(sheet, setup, 2000, '2026-11-05')
+    final = {r['id']: r['adjusted_sar_sqm'] for r in g['rows']}
+    assert round(final['c0']) == 3272 and round(final['c1']) == 2353 and round(final['c2']) == 4242
+    assert round(final['c3']) == 3700 and round(final['c4']) == 4084
+    assert round(next(r for r in g['rows'] if r['id'] == 'c2')['transaction_adjusted_sar_sqm']) == 4990
+    assert round(g['concluded_unrounded_sar_sqm']) == 3825 and g['concluded_sar_sqm'] == 3800
+    assert g['listing_count'] == 2 and g['indication']['base'] == 3800 * 2000
+    # A listing without a negotiation discount is called out, never silently treated as a sale.
+    bare = analyse(sheet, {**setup, 'lines': [l for l in lines if l['factor'] != 'conditions_of_sale']}, 2000, '2026-11-05')
+    assert any('Asking price' in n for r in bare['rows'] if r['id'] == 'c2' for n in r['notes'])
+
+
+@pytest.mark.asyncio
+async def test_a_listing_is_used_only_when_the_valuer_picks_it(client):
+    p = await start(client, 'sales_comparison'); path = '/api/v1/analysis/' + p['property_id']
+    p = (await client.put(path + '/inputs', json=payload(p, {'area_sqm': 500}))).json()
+    await seed_sales(client, p)
+    case_id = (await client.get('/api/v1/properties/' + p['property_id'])).json()['property']['case_id']
+    async with async_session() as db:
+        source = Source(case_id=uuid.UUID(case_id), source_type='url', url='https://example.com/adj/ask')
+        db.add(source); await db.flush()
+        db.add(Comparable(case_id=uuid.UUID(case_id), source_id=source.id, property_title='Asking', property_type='land', city='Riyadh',
+            latitude=24.702, longitude=46.7, evidence_type='listing_asking', asking_price=2000000, primary_area_sqm=500,
+            listing_date='2026-10-20', status='active'))
+        await db.commit()
+    p = (await client.get(path)).json()
+    ask = next(c for c in p['candidates'] if c['title'] == 'Asking')
+    assert not ask['eligible'] and ask['pickable'] and len(p['eligible_comparables']) == 3, 'never used automatically'
+    ids = [c['id'] for c in p['eligible_comparables']][:2] + [ask['id']]
+    p = (await client.put(path + '/adjustments', json={'expected_revision': p['revision'], 'reason': 'Picked', 'adjustments': {'selected': ids, 'round_to': 100}})).json()
+    assert p['ready'] and len(p['eligible_comparables']) == 3 and p['adjustment_analysis']['listing_count'] == 1
+    row = next(r for r in p['adjustment_analysis']['rows'] if r['id'] == ask['id'])
+    assert any('Asking price' in n for n in row['notes'])
+    run = (await client.post(path + '/runs', json={'expected_revision': p['revision']})).json()
+    assert any('asking prices' in l for l in run['outputs']['limitations'])
+
+
+@pytest.mark.asyncio
+async def test_preview_calculates_an_unsaved_grid_without_saving(client):
+    p = await start(client, 'sales_comparison'); path = '/api/v1/analysis/' + p['property_id']
+    p = (await client.put(path + '/inputs', json=payload(p, {'area_sqm': 500}))).json()
+    await seed_sales(client, p)
+    p = (await client.get(path)).json()
+    first = p['eligible_comparables'][0]['id']
+    body = {'adjustments': {'lines': [line(first, 'location', 'percent', -0.10)], 'round_to': 100}}
+    r = (await client.post(path + '/adjustments/preview', json=body)).json()
+    assert r['revision'] == p['revision'] and r['adjustment_analysis']['round_to'] == 100
+    row = next(x for x in r['adjustment_analysis']['rows'] if x['id'] == first)
+    assert row['adjusted_sar_sqm'] == pytest.approx(row['raw_sar_sqm'] * 0.9)
+    after = (await client.get(path)).json()
+    assert after['revision'] == p['revision'] and not (after['adjustment_setup'] or {}).get('lines'), 'preview must not save'

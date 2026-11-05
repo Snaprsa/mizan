@@ -391,13 +391,14 @@ function MapWorkspace() {
         <p className="text-[12.5px] text-[#5F5F64]">{[LAYER[selected.kind].short, selected.price_per_sqm == null ? null : `${Math.round(selected.price_per_sqm).toLocaleString("en-SA")} SAR/m²`, pinCandidate ? (pinCandidate.distance_km < 1 ? `${Math.round(pinCandidate.distance_km * 1000)} m` : `${pinCandidate.distance_km.toFixed(1)} km`) : null, selected.date, /^DEMO · /.test(selected.title) ? "Demo" : null].filter(Boolean).join(" · ")}</p></div>
       <button type="button" aria-label="Close" onClick={() => update({ selectedId: null })} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/[0.05] text-[13px] text-black/60">✕</button>
     </div>
-    {!pinCandidate ? <p className="mt-2 text-[12.5px] text-[#8A5200]">{selected.kind === "transaction" ? `Outside the ${prepared!.radius_km} km search area, so it can’t be picked.` : "Only achieved sales can be picked as comparables."}</p>
-      : !pinCandidate.eligible ? <p className="mt-2 text-[12.5px] text-[#8A5200]">Can’t be picked: {pinCandidate.exclusion_reasons.join("; ").toLowerCase()}.</p>
+    {!pinCandidate ? <p className="mt-2 text-[12.5px] text-[#8A5200]">{selected.kind === "transaction" || selected.kind === "listing" ? `Outside the ${prepared!.radius_km} km search area, so it can’t be picked.` : "Only sales and asking-price listings can be picked as comparables."}</p>
+      : !pinCandidate.eligible && !pinCandidate.pickable ? <p className="mt-2 text-[12.5px] text-[#8A5200]">Can’t be picked: {pinCandidate.exclusion_reasons.join("; ").toLowerCase()}.</p>
       : <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <button type="button" disabled={pickBusy || (!pinPicked && pickDraft.length >= MAX_PICK)} onClick={() => setPickDraft(d => togglePick(d, selected.id))}
           className={`h-9 rounded-full px-4 text-[14px] font-semibold transition-colors duration-150 disabled:opacity-40 ${pinPicked ? "bg-[#0071E3]/10 text-[#0062C4]" : "bg-[#0071E3] text-white"}`}>{pinPicked ? `✓ Picked as ${picked[selected.id]}` : "Pick this sale"}</button>
         {pinPicked && <button type="button" className="text-[13.5px] text-[#C0271B]" onClick={() => setPickDraft(d => togglePick(d, selected.id))}>Remove</button>}
         <span className="flex-1 text-right text-[12.5px] text-[#5F5F64]">{pickDraft.length} picked{pickDraft.length < MIN_PICK ? ` · ${MIN_PICK - pickDraft.length} more needed` : pickDraft.length >= MAX_PICK ? " · the most" : ""}</span>
+        {!pinCandidate.eligible && <p className="w-full text-[12px] text-[#8A5200]">Asking price, not a sale. Apply a negotiation discount in the adjustment table.</p>}
         {pickChanged(pickDraft, prepared) && pickDraft.length >= MIN_PICK && <button type="button" disabled={pickBusy} onClick={storePick} className="h-9 w-full rounded-[10px] bg-[#1D1D1F] text-[14px] font-semibold text-white disabled:opacity-40">{pickBusy ? "Saving…" : `Use these ${pickDraft.length} in the valuation`}</button>}
       </div>}
     {pickError && <p role="alert" className="mt-1 text-[12.5px] text-[#C0271B]">{pickError}</p>}

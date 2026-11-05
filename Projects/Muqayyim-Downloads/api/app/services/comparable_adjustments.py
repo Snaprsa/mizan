@@ -177,6 +177,8 @@ def analyse(eligible, setup, subject_area, as_of, subject=None):
         trail['notes'] = rule_notes + trail['notes']
         # Descriptive details for the comparables table; they never enter the arithmetic.
         trail['details'] = {k: comp.get(k) for k in DETAILS}
+        if comp.get('kind') == 'listing' and not any(s['factor'] == 'conditions_of_sale' and s['delta_sar_sqm'] < 0 for s in trail['steps']):
+            trail['notes'].append('Asking price, not a sale: apply a negotiation discount.')
         if comp['id'] in exclusions:
             excluded.append({**trail, 'exclusion_reason': exclusions[comp['id']]})
         else:
@@ -214,9 +216,12 @@ def analyse(eligible, setup, subject_area, as_of, subject=None):
             if r['adjusted_sar_sqm'] < q1 - fence or r['adjusted_sar_sqm'] > q3 + fence:
                 r['notes'].append(f'Outside the interquartile fences ({q1 - fence:,.0f}–{q3 + fence:,.0f} SAR/m²); review or exclude with a reason.')
     basis = setup.get('conclusion_basis', 'median')
-    concluded = None
+    concluded = unrounded = None
     if not gaps and adjusted_stats:
-        concluded = adjusted_stats.get(basis)
+        concluded = unrounded = adjusted_stats.get(basis)
+        step = setup.get('round_to')
+        if step and concluded is not None:
+            concluded = math.floor(concluded / step + 0.5) * step  # half up, as on a valuation sheet
     indication = None
     if concluded is not None and subject_area:
         indication = {'low': adjusted_stats['p25'] * subject_area, 'base': concluded * subject_area,
@@ -226,7 +231,8 @@ def analyse(eligible, setup, subject_area, as_of, subject=None):
     demo_count = sum(1 for r in rows if r['attributes'].get('is_demo'))
     return {'rows': rows, 'excluded': excluded, 'orphaned_lines': orphaned, 'pending_count': pending, 'demo_count': demo_count,
             'raw': raw_stats, 'adjusted': adjusted_stats, 'weighting': weighting, 'conclusion_basis': basis,
-            'concluded_sar_sqm': concluded, 'indication': indication, 'gaps': gaps,
+            'concluded_sar_sqm': concluded, 'concluded_unrounded_sar_sqm': unrounded, 'round_to': setup.get('round_to'),
+            'listing_count': sum(1 for r in rows if r['details'].get('kind') == 'listing'), 'indication': indication, 'gaps': gaps,
             'conventions': ['Unit values are SAR per m² of each comparable\'s recorded area.',
                             'Transactional adjustments compound in order: conditions of sale → financing → market conditions (time).',
                             'Property adjustments are additive on the transaction-adjusted unit value.',
